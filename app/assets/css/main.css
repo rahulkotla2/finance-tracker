@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+body {
+    font-family: 'Inter';
+}
+
+body {
+    @apply dark:bg-gray-900 bg-white
+}

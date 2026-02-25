@@ -10,7 +10,10 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@nuxt/ui": "^4.4.0",
+    "heroicons": "link:@iconify-json\\heroicons",
     "nuxt": "^4.3.1",
+    "tailwindcss": "^4.1.18",
     "vue": "^3.5.27",
     "vue-router": "^4.6.4"
   }
