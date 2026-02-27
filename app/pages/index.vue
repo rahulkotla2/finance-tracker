@@ -15,20 +15,21 @@
     <section class="flex justify-between mb-10">
         <div>
             <h2>Transactions</h2>
-            <div class="text-gray-500 dark:text-gray-400">You have {{ incomeCount }} incomes and {{ expenseCount }}
-                expenses this period</div>
+            <div class="text-gray-500 dark:text-gray-400">
+                You have {{ incomeCount }} incomes and {{ expenseCount }} expenses this
+                period
+            </div>
         </div>
         <div>
-
             <TransactionModal @saved="refreshTransactions" />
         </div>
     </section>
 
     <section v-if="!pending">
-        <div v-for="(transactionsOnDay, date) in transactionGroupedByDate" :key="date">
+        <div v-for="(transactionsOnDay, date) in byDate" :key="date">
             <DailyTransactionSummary :date="date" :transactions="transactionsOnDay" :key="date" />
             <Transaction v-for="transaction in transactionsOnDay" :key="transaction.id" :transaction="transaction"
-                @deleted="deleteTransaction" />
+                @deleted="refreshTransactions" />
         </div>
     </section>
     <section v-else>
@@ -37,51 +38,19 @@
 </template>
 
 <script setup>
-import { transactionViewOptions } from '~/constants'
+import { transactionViewOptions } from "~/constants";
 
-const selectedView = ref('Monthly')
+const selectedView = ref("Monthly");
 
-const supabase = useSupabaseClient()
-
-const income = computed(() => {
-    return transactions.value.filter(transaction => transaction.type === 'income')
-})
-
-const expense = computed(() => {
-    return transactions.value.filter(transaction => transaction.type === 'expense')
-})
-
-const incomeCount = computed(() => income.value.length)
-const expenseCount = computed(() => expense.value.length)
-
-const incomeTotal = computed(() => income.value.reduce((acc, transaction) => acc + transaction.amount, 0))
-const expenseTotal = computed(() => expense.value.reduce((acc, transaction) => acc + transaction.amount, 0))
-
-const { data: transactions, pending, refresh: refreshTransactions } = await useAsyncData('transactions', async () => {
-
-    const { data, error } = await supabase
-        .from('transactions')
-        .select()
-        .order('created_at', { ascending: false })
-    if (error) return []
-    return data
-
-})
-
-const transactionGroupedByDate = computed(() => {
-    let grouped = {}
-    transactions.value?.forEach(transaction => {
-        const date = new Date(transaction.created_at).toISOString().split('T')[0]
-        if (!grouped[date]) {
-            grouped[date] = []
-        }
-        grouped[date].push(transaction)
-    });
-    return grouped;
-});
-
-
-const deleteTransaction = async (id) => {
-    await refreshTransactions()
-}
+const {
+    transactions: {
+        grouped: { byDate },
+        incomeCount,
+        expenseCount,
+        incomeTotal,
+        expenseTotal,
+    },
+    pending,
+    refreshTransactions,
+} = await useFetchTransactions();
 </script>
