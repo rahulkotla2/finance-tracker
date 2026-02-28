@@ -34,6 +34,7 @@ export const useFetchTransactions = async (period) => {
       .gte("created_at", period.value.from.toISOString())
       .lte("created_at", period.value.to.toISOString())
       .order("created_at", { ascending: false });
+      console.log(data)
     if (error) return [];
     return data;
   });
@@ -41,7 +42,7 @@ export const useFetchTransactions = async (period) => {
   const transactionGroupedByDate = computed(() => {
     let grouped = {};
     transactions.value?.forEach((transaction) => {
-      const date = new Date(transaction.created_at).toISOString().split("T")[0];
+      const date =transaction.created_at.split("T")[0];
       if (!grouped[date]) {
         grouped[date] = [];
       }

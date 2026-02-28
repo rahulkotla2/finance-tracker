@@ -16,6 +16,7 @@
                 <UDropdownMenu :items="items" :popper="{ placement: 'bottom-start' }">
                     <UButton trailing-icon="i-heroicons-ellipsis-horizontal-solid" color="neutral" variant="ghost"
                         :loading="isLoading" />
+                    <TransactionModal :transaction="transaction" @saved="emit('edited')" v-model:isOpen="isOpen" />
                 </UDropdownMenu>
             </div>
         </div>
@@ -31,8 +32,8 @@ const props = defineProps({
     }
 })
 
-const emit = defineEmits(['deleted'])
-
+const emit = defineEmits(['deleted', 'edited'])
+const isOpen = ref(false)
 const { currency } = useCurrency(props.transaction.amount)
 const supabase = useSupabaseClient()
 
@@ -72,7 +73,7 @@ const items = [[
         label: 'Edit',
         icon: 'i-heroicons-pencil-square-20-solid',
         onSelect: () => {
-            console.log('Edit')
+            isOpen.value = true
         }
     },
     {

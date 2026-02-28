@@ -23,7 +23,11 @@
             </div>
         </div>
         <div>
-            <TransactionModal @saved="refreshTransactions" />
+            <TransactionModal @saved="refreshTransactions" v-model:isOpen="isOpen" />
+            <UButton color="neutral" icon="i-heroicons-plus-circle-solid" variant="outline" label="Add"
+                @click="isOpen = true">
+                Add
+            </UButton>
         </div>
     </section>
 
@@ -31,7 +35,7 @@
         <div v-for="(transactionsOnDay, date) in byDate" :key="date">
             <DailyTransactionSummary :date="date" :transactions="transactionsOnDay" :key="date" />
             <Transaction v-for="transaction in transactionsOnDay" :key="transaction.id" :transaction="transaction"
-                @deleted="refreshTransactions" />
+                @deleted="refreshTransactions" @edited="refreshTransactions" />
         </div>
     </section>
     <section v-else>
@@ -44,7 +48,7 @@ import { transactionViewOptions } from "~/constants";
 const user = useSupabaseUser();
 
 const selectedView = ref(user.value.user_metadata?.transaction_view ?? transactionViewOptions[1]);
-
+const isOpen = ref(false)
 watch(selectedView, () => {
     refreshTransactions()
     previousRefreshTransactions()
