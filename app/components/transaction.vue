@@ -49,7 +49,7 @@ const iconColor = computed(() => {
 })
 
 const isLoading = ref(false)
-const toast = useToast()
+const { toastSuccess, toastError } = useAppToast()
 
 const deleteTransaction = async () => {
     isLoading.value = true
@@ -58,18 +58,10 @@ const deleteTransaction = async () => {
             .from('transactions')
             .delete()
             .eq('id', props.transaction.id)
-        toast.add({
-            title: 'Transaction deleted',
-            icon: 'i-heroicons-check-circle-solid',
-            color: 'primary'
-        })
+        toastSuccess({ title: 'Transaction deleted' })
         emit('deleted', props.transaction.id)
     } catch (error) {
-        toast.add({
-            title: 'Error deleting transaction',
-            icon: 'i-heroicons-exclamation-circle-solid',
-            color: 'error'
-        })
+        toastError({ title: 'Error deleting transaction', description: error.message })
     } finally {
         isLoading.value = false
     }

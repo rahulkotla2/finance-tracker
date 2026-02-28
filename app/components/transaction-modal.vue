@@ -93,7 +93,7 @@ const resetForm = () => {
 
 const formRef = ref()
 const isLoading = ref(false)
-const toast = useToast()
+const { toastSuccess, toastError } = useAppToast()
 const supabase = useSupabaseClient()
 
 const save = async () => {
@@ -103,20 +103,11 @@ const save = async () => {
     try {
         const { error } = await supabase.from('transactions').upsert({ ...state.value })
         if (error) throw error
-        toast.add({
-            title: 'Transaction saved',
-            icon: 'i-heroicons-check-circle-solid',
-            color: 'success'
-        })
+        toastSuccess({ title: 'Transaction saved' })
         isOpen.value = false
         emit('saved', state.value)
     } catch (error) {
-        toast.add({
-            title: 'Error saving transaction',
-            description: error.message,
-            icon: 'i-heroicons-exclamation-circle-solid',
-            color: 'error'
-        })
+        toastError({ title: 'Error saving transaction', description: error.message })
     } finally {
         isLoading.value = false
     }

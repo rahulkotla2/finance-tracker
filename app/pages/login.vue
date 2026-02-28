@@ -23,28 +23,27 @@
 const success = ref(false)
 const email = ref('')
 const pending = ref(false)
-const toast = useToast()
+const { toastError } = useAppToast()
 const supabase = useSupabaseClient()
 useRedirectedIfAuthenticated()
 
 const handleLogin = async () => {
     pending.value = true
     try {
-        const { error } = await supabase.auth.signInWithOtp({
+        // const { error } = await supabase.auth.signInWithOtp({
+        //     email: email.value,
+        //     options: {
+        //         emailRedirectTo: `http://localhost:3000`
+        //     }
+        // })
+        const { error } = await supabase.auth.signInWithPassword({
             email: email.value,
-            options: {
-                emailRedirectTo: `http://localhost:3000`
-            }
+            password: "Mangamma@123",
         })
         if (error) throw error
         success.value = true
     } catch (error) {
-        toast.add({
-            title: 'Error Authenticating',
-            description: error.message,
-            icon: 'i-heroicons-exclamation-circle-solid',
-            color: 'error'
-        })
+        toastError({ title: 'Error Authenticating', description: error.message })
     }
     finally {
         pending.value = false
