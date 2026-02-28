@@ -10,8 +10,9 @@
             :loading="pending" />
         <Trend color="red" title="Expense" :amount="expenseTotal" :last-amount="previousExpenseTotal"
             :loading="pending" />
-        <Trend color="green" title="Investments" :amount="4000" :last-amount="3000" :loading="pending" />
-        <Trend color="red" title="Saving" :amount="4000" :last-amount="4100" :loading="pending" />
+        <Trend color="green" title="Investments" :amount="investmentTotal" :last-amount="previousInvestmentTotal"
+            :loading="pending" />
+        <Trend color="red" title="Saving" :amount="savingTotal" :last-amount="previousSavingTotal" :loading="pending" />
     </section>
 
     <section class="flex justify-between mb-10">
@@ -23,7 +24,7 @@
             </div>
         </div>
         <div>
-            <TransactionModal @saved="refreshTransactions" v-model:isOpen="isOpen" />
+            <TransactionModal @saved="refreshData" v-model:isOpen="isOpen" />
             <UButton color="neutral" icon="i-heroicons-plus-circle-solid" variant="outline" label="Add"
                 @click="isOpen = true">
                 Add
@@ -35,7 +36,7 @@
         <div v-for="(transactionsOnDay, date) in byDate" :key="date">
             <DailyTransactionSummary :date="date" :transactions="transactionsOnDay" :key="date" />
             <Transaction v-for="transaction in transactionsOnDay" :key="transaction.id" :transaction="transaction"
-                @deleted="refreshTransactions" @edited="refreshTransactions" />
+                @deleted="refreshData" @edited="refreshData" />
         </div>
     </section>
     <section v-else>
@@ -47,12 +48,13 @@
 import { transactionViewOptions } from "~/constants";
 const user = useSupabaseUser();
 
-const selectedView = ref(user.value.user_metadata?.transaction_view ?? transactionViewOptions[1]);
-const isOpen = ref(false)
+const selectedView = ref(
+    user.value.user_metadata?.transaction_view ?? transactionViewOptions[1],
+);
+const isOpen = ref(false);
 watch(selectedView, () => {
-    refreshTransactions()
-    previousRefreshTransactions()
-})
+    refreshData();
+});
 
 const { currentPeriod, previousPeriod } = useSelectedTimePeriod(selectedView);
 const {
@@ -60,6 +62,8 @@ const {
         grouped: { byDate },
         incomeCount,
         expenseCount,
+        investmentTotal,
+        savingTotal,
         incomeTotal,
         expenseTotal,
     },
@@ -67,10 +71,17 @@ const {
     refreshTransactions,
 } = await useFetchTransactions(currentPeriod);
 
+const refreshData = () => {
+    refreshTransactions();
+    previousRefreshTransactions();
+}
+
 const {
     transactions: {
         incomeTotal: previousIncomeTotal,
         expenseTotal: previousExpenseTotal,
+        investmentTotal: previousInvestmentTotal,
+        savingTotal: previousSavingTotal,
     },
     refreshTransactions: previousRefreshTransactions,
 } = await useFetchTransactions(previousPeriod);
