@@ -37,7 +37,7 @@ const { currency } = useCurrency(props.transaction.amount)
 const supabase = useSupabaseClient()
 
 const isIncome = computed(() => {
-    return props.transaction.type === 'income'
+    return props.transaction.type === 'Income'
 })
 
 const icon = computed(() => {

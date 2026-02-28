@@ -5,6 +5,6 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   css: ['~/assets/css/main.css'],
   supabase: {
-    redirect: false
+    redirect: true
   }
 })

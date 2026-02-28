@@ -1,15 +1,15 @@
-export const useFetchTransactions = async () => {
+export const useFetchTransactions = async (period) => {
   const supabase = useSupabaseClient();
 
   const income = computed(() => {
     return transactions.value.filter(
-      (transaction) => transaction.type === "income",
+      (transaction) => transaction.type === "Income",
     );
   });
 
   const expense = computed(() => {
     return transactions.value.filter(
-      (transaction) => transaction.type === "expense",
+      (transaction) => transaction.type === "Expense",
     );
   });
 
@@ -27,10 +27,12 @@ export const useFetchTransactions = async () => {
     data: transactions,
     pending,
     refresh: refreshTransactions,
-  } = await useAsyncData("transactions", async () => {
+  } = await useAsyncData(`${period.value.from.toDateString()}-${period.value.to.toDateString()}-transactions`, async () => {
     const { data, error } = await supabase
       .from("transactions")
       .select()
+      .gte("created_at", period.value.from.toISOString())
+      .lte("created_at", period.value.to.toISOString())
       .order("created_at", { ascending: false });
     if (error) return [];
     return data;
