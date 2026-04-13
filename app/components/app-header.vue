@@ -1,6 +1,15 @@
 <template>
   <header class="flex justify-between items-center mt-10">
-    <NuxtLink to="/" class="text-xl font-bold"> Finance Tracker </NuxtLink>
+    <div class="flex items-center gap-6">
+      <NuxtLink to="/" class="text-2xl font-bold tracking-tight">Finance Tracker</NuxtLink>
+      <NuxtLink
+        v-if="user"
+        to="/groups"
+        class="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+      >
+        Groups
+      </NuxtLink>
+    </div>
     <UDropdownMenu
       :items="items"
       :ui="{ item: { disabled: 'cursor-text select-text' }, width: 'w-64' }"
@@ -37,7 +46,7 @@ const supabase = useSupabaseClient();
 const user = useSupabaseUser();
 const { url: avatarUrl } = useAvatarUrl()
 
-const items = [
+  const items = [
   [
     {
       slot: "account",

@@ -1,8 +1,9 @@
 <template>
     <section class="flex items-center justify-between mb-10">
         <h1 class="text-4xl font-extrabold">Summary</h1>
-        <div>
+        <div class="flex items-center gap-3">
             <USelectMenu v-model="selectedView" :items="transactionViewOptions" />
+            <UButton color="primary" variant="solid" label="Groups" @click="goToGroups" />
         </div>
     </section>
     <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 sm:gap-16 mb-10">
@@ -45,44 +46,51 @@
 </template>
 
 <script setup>
+import { navigateTo } from "#app";
 import { transactionViewOptions } from "~/constants";
 const user = useSupabaseUser();
 
 const selectedView = ref(
-    user.value.user_metadata?.transaction_view ?? transactionViewOptions[1],
+  user.value.user_metadata?.transaction_view ?? transactionViewOptions[1],
 );
 const isOpen = ref(false);
-watch(selectedView, () => {
-    refreshData();
-});
 
 const { currentPeriod, previousPeriod } = useSelectedTimePeriod(selectedView);
-const {
-    transactions: {
-        grouped: { byDate },
-        incomeCount,
-        expenseCount,
-        investmentTotal,
-        savingTotal,
-        incomeTotal,
-        expenseTotal,
-    },
-    pending,
-    refreshTransactions,
-} = await useFetchTransactions(currentPeriod);
 
 const refreshData = () => {
-    refreshTransactions();
-    previousRefreshTransactions();
-}
+  refreshTransactions();
+  previousRefreshTransactions();
+};
+
+const goToGroups = () => {
+  navigateTo("/groups");
+};
 
 const {
-    transactions: {
-        incomeTotal: previousIncomeTotal,
-        expenseTotal: previousExpenseTotal,
-        investmentTotal: previousInvestmentTotal,
-        savingTotal: previousSavingTotal,
-    },
-    refreshTransactions: previousRefreshTransactions,
-} = await useFetchTransactions(previousPeriod);
+  transactions: {
+    grouped: { byDate },
+    incomeCount,
+    expenseCount,
+    investmentTotal,
+    savingTotal,
+    incomeTotal,
+    expenseTotal,
+  },
+  pending,
+  refreshTransactions,
+} = await useFetchTransactions(currentPeriod, { scope: "mine" });
+
+const {
+  transactions: {
+    incomeTotal: previousIncomeTotal,
+    expenseTotal: previousExpenseTotal,
+    investmentTotal: previousInvestmentTotal,
+    savingTotal: previousSavingTotal,
+  },
+  refreshTransactions: previousRefreshTransactions,
+} = await useFetchTransactions(previousPeriod, { scope: "mine" });
+
+watch(selectedView, () => {
+  refreshData();
+});
 </script>

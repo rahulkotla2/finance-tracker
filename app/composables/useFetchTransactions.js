@@ -1,29 +1,76 @@
-export const useFetchTransactions = async (period) => {
+import { computed, unref } from "vue";
+
+/**
+ * @param {import('vue').Ref | import('vue').ComputedRef} period
+ * @param {object} [options]
+ * @param {'mine' | 'group'} [options.scope='mine']
+ * @param {import('vue').Ref<string>|string|null} [options.groupId]
+ */
+export const useFetchTransactions = async (period, options = {}) => {
   const supabase = useSupabaseClient();
+  const user = useSupabaseUser();
 
-  const income = computed(() => {
-    return transactions.value.filter(
-      (transaction) => transaction.type === "Income",
-    );
+  const scope = options.scope ?? "mine";
+
+  const asyncKey = computed(() => {
+    const p = unref(period);
+    const from = p?.from?.getTime?.() ?? "";
+    const to = p?.to?.getTime?.() ?? "";
+    const gid = unref(options.groupId) ?? "";
+    const uid = user.value?.id ?? "";
+    return ["transactions", from, to, scope, gid, uid].join(":");
   });
 
-  const expense = computed(() => {
-    return transactions.value.filter(
-      (transaction) => transaction.type === "Expense",
-    );
-  });
+  const {
+    data: transactions,
+    pending,
+    refresh: refreshTransactions,
+  } = await useAsyncData(
+    asyncKey,
+    async () => {
+      const p = unref(period);
+      if (!p?.from || !p?.to) return [];
 
-  const investment = computed(() => {
-    return transactions.value.filter(
-      (transaction) => transaction.type === "Investment",
-    );
-  });
+      const gid = unref(options.groupId);
+      if (scope === "group" && !gid) return [];
+      if (scope === "mine" && !user.value?.id) return [];
 
-  const saving = computed(() => {
-    return transactions.value.filter(
-      (transaction) => transaction.type === "Saving",
-    );
-  });
+      let query = supabase
+        .from("transactions")
+        .select("*, expense_groups(name)")
+        .gte("created_at", p.from.toISOString())
+        .lte("created_at", p.to.toISOString())
+        .order("created_at", { ascending: false });
+
+      if (scope === "mine") {
+        query = query.eq("user_id", user.value.id);
+      } else {
+        query = query.eq("group_id", gid);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.error(error);
+        return [];
+      }
+
+      return data ?? [];
+    },
+    { watch: [asyncKey] },
+  );
+
+  const income = computed(() =>
+    (transactions.value ?? []).filter((t) => t.type === "Income"),
+  );
+  const expense = computed(() =>
+    (transactions.value ?? []).filter((t) => t.type === "Expense"),
+  );
+  const investment = computed(() =>
+    (transactions.value ?? []).filter((t) => t.type === "Investment"),
+  );
+  const saving = computed(() =>
+    (transactions.value ?? []).filter((t) => t.type === "Saving"),
+  );
 
   const incomeCount = computed(() => income.value.length);
   const expenseCount = computed(() => expense.value.length);
@@ -31,43 +78,25 @@ export const useFetchTransactions = async (period) => {
   const savingCount = computed(() => saving.value.length);
 
   const incomeTotal = computed(() =>
-    income.value.reduce((acc, transaction) => acc + transaction.amount, 0),
+    income.value.reduce((acc, t) => acc + t.amount, 0),
   );
   const expenseTotal = computed(() =>
-    expense.value.reduce((acc, transaction) => acc + transaction.amount, 0),
+    expense.value.reduce((acc, t) => acc + t.amount, 0),
   );
   const investmentTotal = computed(() =>
-    investment.value.reduce((acc, transaction) => acc + transaction.amount, 0),
+    investment.value.reduce((acc, t) => acc + t.amount, 0),
   );
   const savingTotal = computed(() =>
-    saving.value.reduce((acc, transaction) => acc + transaction.amount, 0),
+    saving.value.reduce((acc, t) => acc + t.amount, 0),
   );
 
-  const {
-    data: transactions,
-    pending,
-    refresh: refreshTransactions,
-  } = await useAsyncData(`${period.value.from.toDateString()}-${period.value.to.toDateString()}-transactions`, async () => {
-    const { data, error } = await supabase
-      .from("transactions")
-      .select()
-      .gte("created_at", period.value.from.toISOString())
-      .lte("created_at", period.value.to.toISOString())
-      .order("created_at", { ascending: false });
-      console.log(data)
-    if (error) return [];
-    return data;
-  });
-
   const transactionGroupedByDate = computed(() => {
-    let grouped = {};
-    transactions.value?.forEach((transaction) => {
-      const date =transaction.created_at.split("T")[0];
-      if (!grouped[date]) {
-        grouped[date] = [];
-      }
+    const grouped = {};
+    for (const transaction of transactions.value ?? []) {
+      const date = transaction.created_at.split("T")[0];
+      if (!grouped[date]) grouped[date] = [];
       grouped[date].push(transaction);
-    });
+    }
     return grouped;
   });
 
