@@ -11,34 +11,27 @@ async function generateInviteToken() {
 
 export function useExpenseGroups() {
   const supabase = useSupabaseClient();
-  const user = useSupabaseUser();
 
   async function listMyMemberships() {
-    const uid = user.value?.id;
-    if (!uid) return { data: [], error: null };
-
     return supabase
       .from("group_members")
       .select("id, role, status, expense_groups(id, name, created_at)")
-      .eq("user_id", uid)
       .order("created_at", { ascending: false });
   }
 
   async function createGroupWithInvite(name) {
-    const uid = user.value?.id;
-    if (!uid) throw new Error("Not signed in");
-
     const { data: group, error: groupError } = await supabase
       .from("expense_groups")
-      .insert({ name, created_by: uid })
+      .insert({ name })
       .select("id, name")
       .single();
+
+    console.log(groupError);
 
     if (groupError) throw groupError;
 
     const { error: membershipError } = await supabase.from("group_members").insert({
       group_id: group.id,
-      user_id: uid,
       role: "owner",
       status: "active",
     });
@@ -55,7 +48,6 @@ export function useExpenseGroups() {
       .insert({
         token,
         group_id: group.id,
-        invited_by: uid,
         expires_at: expiresAt.toISOString(),
       })
       .select("token, expires_at")

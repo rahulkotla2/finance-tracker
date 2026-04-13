@@ -8,7 +8,6 @@ import { computed, unref } from "vue";
  */
 export const useFetchTransactions = async (period, options = {}) => {
   const supabase = useSupabaseClient();
-  const user = useSupabaseUser();
 
   const scope = options.scope ?? "mine";
 
@@ -17,8 +16,7 @@ export const useFetchTransactions = async (period, options = {}) => {
     const from = p?.from?.getTime?.() ?? "";
     const to = p?.to?.getTime?.() ?? "";
     const gid = unref(options.groupId) ?? "";
-    const uid = user.value?.id ?? "";
-    return ["transactions", from, to, scope, gid, uid].join(":");
+    return ["transactions", from, to, scope, gid].join(":");
   });
 
   const {
@@ -30,11 +28,8 @@ export const useFetchTransactions = async (period, options = {}) => {
     async () => {
       const p = unref(period);
       if (!p?.from || !p?.to) return [];
-
       const gid = unref(options.groupId);
       if (scope === "group" && !gid) return [];
-      if (scope === "mine" && !user.value?.id) return [];
-
       let query = supabase
         .from("transactions")
         .select("*, expense_groups(name)")
@@ -42,9 +37,7 @@ export const useFetchTransactions = async (period, options = {}) => {
         .lte("created_at", p.to.toISOString())
         .order("created_at", { ascending: false });
 
-      if (scope === "mine") {
-        query = query.eq("user_id", user.value.id);
-      } else {
+      if (scope === "group") {
         query = query.eq("group_id", gid);
       }
 

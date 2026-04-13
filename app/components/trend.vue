@@ -41,7 +41,6 @@ const icon = computed(() => {
 const { currency } = useCurrency(amount)
 
 const percentageTrend = computed(() => {
-    console.log(props.lastAmount, props.amount)
     if (props.lastAmount === 0 || props.amount === 0) return '♾️%'
     const biggerAmount = Math.max(props.amount, props.lastAmount)
     const smallerAmount = Math.min(props.amount, props.lastAmount)
