@@ -41,28 +41,54 @@
       <div v-if="!memberships.length" class="text-sm text-gray-500">No memberships yet.</div>
       <div class="grid gap-4">
         <article
-          v-for="member in memberships"
-          :key="member.id"
+          v-for="group in memberships"
+          :key="group.id"
           class="border border-gray-200 rounded-lg p-4 dark:border-gray-800 bg-white dark:bg-gray-900"
         >
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="font-semibold text-lg">{{ member.expense_groups?.name ?? "Unnamed group" }}</p>
-              <p class="text-xs uppercase tracking-wider text-gray-500">
-                {{ member.status }} • {{ member.role }}
-              </p>
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <p class="font-semibold text-lg">{{ group.name ?? "Unnamed group" }}</p>
+                <UBadge v-if="group.is_owner" color="warning" variant="subtle">Owner</UBadge>
+              </div>
             </div>
             <NuxtLink
-              v-if="member.status === 'active' && member.expense_groups?.id"
-              :to="`/groups/${member.expense_groups.id}`"
-              class="text-sm font-medium text-blue-600 dark:text-blue-400"
+              v-if="group.id"
+              :to="`/groups/${group.id}`"
+              class="text-sm font-medium shrink-0 text-blue-600 dark:text-blue-400"
             >
               View
             </NuxtLink>
           </div>
-          <p class="text-xs text-gray-500">
-            Created {{ member.expense_groups?.created_at ? new Date(member.expense_groups.created_at).toLocaleDateString() : "—" }}
+          <p class="text-xs text-gray-500 mt-1">
+            Created {{ group.created_at ? new Date(group.created_at).toLocaleDateString() : "—" }}
           </p>
+          <div
+            v-if="group.is_owner && group.token"
+            class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-800"
+          >
+            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Invite token</p>
+            <p class="text-xs font-mono break-all text-gray-700 dark:text-gray-300 mb-3">{{ group.token }}</p>
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                size="xs"
+                color="neutral"
+                variant="outline"
+                icon="i-heroicons-clipboard-document"
+                label="Copy"
+                @click="copyGroupToken(group.token)"
+              />
+              <UButton
+                v-if="canShare"
+                size="xs"
+                color="neutral"
+                variant="outline"
+                icon="i-heroicons-share"
+                label="Share"
+                @click="shareGroupInvite(group)"
+              />
+            </div>
+          </div>
         </article>
       </div>
     </section>
@@ -70,7 +96,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useExpenseGroups } from "~/composables/useExpenseGroups";
 
 const { listMyMemberships, createGroupWithInvite, acceptInvite } = useExpenseGroups();
@@ -82,6 +108,32 @@ const joinToken = ref("");
 const memberships = ref([]);
 const isCreating = ref(false);
 const isJoining = ref(false);
+
+const canShare = computed(
+  () => import.meta.client && typeof navigator !== "undefined" && typeof navigator.share === "function",
+);
+
+const copyGroupToken = async (token) => {
+  try {
+    await navigator.clipboard.writeText(token);
+    toastSuccess({ title: "Copied", description: "Invite token copied to clipboard." });
+  } catch (error) {
+    toastError({ title: "Copy failed", description: error.message });
+  }
+};
+
+const shareGroupInvite = async (group) => {
+  if (!group?.token) return;
+  try {
+    await navigator.share({
+      title: `Join ${group.name ?? "group"}`,
+      text: `Invite token for "${group.name ?? "group"}": ${group.token}`,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+    toastError({ title: "Share failed", description: error.message });
+  }
+};
 
 const refresh = async () => {
   const { data, error } = await listMyMemberships();

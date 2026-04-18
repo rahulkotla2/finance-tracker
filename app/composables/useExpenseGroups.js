@@ -13,10 +13,7 @@ export function useExpenseGroups() {
   const supabase = useSupabaseClient();
 
   async function listMyMemberships() {
-    return supabase
-      .from("group_members")
-      .select("id, role, status, expense_groups(id, name, created_at)")
-      .order("created_at", { ascending: false });
+    return supabase.rpc("get_user_groups");
   }
 
   async function createGroupWithInvite(name) {
@@ -30,11 +27,13 @@ export function useExpenseGroups() {
 
     if (groupError) throw groupError;
 
-    const { error: membershipError } = await supabase.from("group_members").insert({
-      group_id: group.id,
-      role: "owner",
-      status: "active",
-    });
+    const { error: membershipError } = await supabase
+      .from("group_members")
+      .insert({
+        group_id: group.id,
+        role: "owner",
+        status: "active",
+      });
 
     if (membershipError) throw membershipError;
 
