@@ -70,9 +70,29 @@ export function useExpenseGroups() {
     return data;
   }
 
+  async function getMyGroupMembership(groupId) {
+    return supabase
+      .from("group_members")
+      .select("id, role, status, expense_groups(id, name)")
+      .eq("group_id", groupId)
+      .eq("status", "active")
+      .maybeSingle();
+  }
+
+  async function listGroupMembers(groupId) {
+    return supabase
+      .from("group_members")
+      .select("id, role, status, user_id, profiles(full_name, avatar_url)")
+      .eq("group_id", groupId)
+      .eq("status", "active")
+      .order("created_at", { ascending: true });
+  }
+
   return {
     listMyMemberships,
     createGroupWithInvite,
     acceptInvite,
+    getMyGroupMembership,
+    listGroupMembers,
   };
 }

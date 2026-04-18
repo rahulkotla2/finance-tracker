@@ -9,7 +9,10 @@
         <UBadge color="neutral" variant="outline" v-if="transaction.category">
           {{ transaction.category }}
         </UBadge>
-        <UBadge color="info" variant="subtle" v-if="groupName">
+        <UBadge color="neutral" variant="subtle" v-if="showOwnerBadge && ownerLabel">
+          {{ ownerLabel }}
+        </UBadge>
+        <UBadge color="info" variant="subtle" v-if="showGroupBadge && groupName">
           {{ groupName }}
         </UBadge>
       </div>
@@ -26,7 +29,7 @@
           />
           <TransactionModal
             :transaction="transaction"
-            :group-id="transaction.group_id"
+            :group-id="transaction.group_id ?? groupId"
             @saved="emit('edited')"
             v-model:isOpen="isOpen"
           />
@@ -42,6 +45,18 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  groupId: {
+    type: String,
+    default: null,
+  },
+  showGroupBadge: {
+    type: Boolean,
+    default: true,
+  },
+  showOwnerBadge: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(["deleted", "edited"]);
@@ -55,6 +70,15 @@ const icon = computed(() =>
 );
 const iconColor = computed(() => (isIncome.value ? "text-green-600" : "text-red-600"));
 const groupName = computed(() => props.transaction.expense_groups?.name);
+
+const ownerLabel = computed(() => {
+  const p = props.transaction.profiles;
+  const name = Array.isArray(p) ? p[0]?.full_name : p?.full_name;
+  if (name) return name;
+  const uid = props.transaction.user_id;
+  if (uid && typeof uid === "string") return `…${uid.slice(-6)}`;
+  return null;
+});
 
 const isLoading = ref(false);
 const { toastSuccess, toastError } = useAppToast();

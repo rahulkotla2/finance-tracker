@@ -1,4 +1,5 @@
 import { computed, unref } from "vue";
+import { groupTransactionsByDate } from "~/utils/transactions";
 
 /**
  * @param {import('vue').Ref | import('vue').ComputedRef} period
@@ -30,9 +31,14 @@ export const useFetchTransactions = async (period, options = {}) => {
       if (!p?.from || !p?.to) return [];
       const gid = unref(options.groupId);
       if (scope === "group" && !gid) return [];
+      const select =
+        scope === "group"
+          ? "*, expense_groups(name), profiles(full_name, avatar_url)"
+          : "*, expense_groups(name)";
+
       let query = supabase
         .from("transactions")
-        .select("*, expense_groups(name)")
+        .select(select)
         .gte("created_at", p.from.toISOString())
         .lte("created_at", p.to.toISOString())
         .order("created_at", { ascending: false });
@@ -83,15 +89,9 @@ export const useFetchTransactions = async (period, options = {}) => {
     saving.value.reduce((acc, t) => acc + t.amount, 0),
   );
 
-  const transactionGroupedByDate = computed(() => {
-    const grouped = {};
-    for (const transaction of transactions.value ?? []) {
-      const date = transaction.created_at.split("T")[0];
-      if (!grouped[date]) grouped[date] = [];
-      grouped[date].push(transaction);
-    }
-    return grouped;
-  });
+  const transactionGroupedByDate = computed(() =>
+    groupTransactionsByDate(transactions.value ?? []),
+  );
 
   return {
     transactions: {

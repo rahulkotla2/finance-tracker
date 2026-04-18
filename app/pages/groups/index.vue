@@ -54,7 +54,7 @@
             </div>
             <NuxtLink
               v-if="member.status === 'active' && member.expense_groups?.id"
-              to="/groups"
+              :to="`/groups/${member.expense_groups.id}`"
               class="text-sm font-medium text-blue-600 dark:text-blue-400"
             >
               View
