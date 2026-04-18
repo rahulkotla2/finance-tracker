@@ -82,7 +82,7 @@ export function useExpenseGroups() {
   async function listGroupMembers(groupId) {
     return supabase
       .from("group_members")
-      .select("id, role, status, user_id, profiles(full_name, avatar_url)")
+      .select("id, role, status, user_id, profiles(id, full_name, avatar_url)")
       .eq("group_id", groupId)
       .eq("status", "active")
       .order("created_at", { ascending: true });

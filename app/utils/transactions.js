@@ -37,6 +37,6 @@ export function summarizeTransactions(transactions) {
  * @param {string | null} userId
  */
 export function filterTransactionsByUserId(transactions, userId) {
-  if (!userId) return transactions ?? [];
+  if (!userId || userId === "ALL") return transactions ?? [];
   return (transactions ?? []).filter((t) => t.user_id === userId);
 }
