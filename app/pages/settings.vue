@@ -22,6 +22,10 @@ const items = [[
         label: 'Settings',
         to: '/settings/settings',
     },
+    {
+        label: 'Password',
+        to: '/settings/password',
+    },
 ]]
 
 </script>
