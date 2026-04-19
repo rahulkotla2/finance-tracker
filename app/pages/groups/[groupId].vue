@@ -13,13 +13,16 @@
           <div v-if="membersPending" class="flex gap-2 flex-wrap">
             <USkeleton class="h-10 w-32 rounded-full" />
           </div>
-          <div v-else-if="owner" class="flex flex-wrap justify-end gap-2">
-            <div
-              class="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm"
-            >
-              <UAvatar v-if="avatarSrc(owner)" :src="avatarSrc(owner)" size="xs" />
-              <span class="font-medium">{{ memberDisplayName(owner) }}</span>
-            </div>
+          <div
+            v-else-if="owner"
+            class="h-fit inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm"
+          >
+            <UAvatar
+              v-if="avatarSrc(owner)"
+              :src="avatarSrc(owner)"
+              size="xs"
+            />
+            <span class="font-medium">{{ memberDisplayName(owner) }}</span>
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-3">

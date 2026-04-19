@@ -49,10 +49,10 @@
         <template #header> Sign-in to Finance Tracker</template>
         <form
           @submit.prevent="handlePasswordLogin"
-          class="grid grid-cols-2 gap-4"
+          class="grid grid-cols-1 lg:grid-cols-2 gap-4"
         >
           <UFormField
-            class="col-span-1"
+            class="w-full"
             label="Email"
             name="email"
             :required="true"
@@ -66,7 +66,7 @@
             />
           </UFormField>
           <UFormField
-            class="col-span-1"
+            class="w-full"
             label="Password"
             name="password"
             :required="true"
@@ -79,11 +79,11 @@
             />
           </UFormField>
           <UButton
-            class="col-span-2 w-fit justify-self-end"
+            class="lg:w-fit justify-self-end col-span-1 lg:col-span-2"
             type="submit"
-            label="Sign in"
             color="neutral"
             variant="solid"
+            label="Sign in"
             :loading="pending"
             :disabled="pending"
           />

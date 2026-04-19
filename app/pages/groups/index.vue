@@ -1,11 +1,19 @@
 <template>
   <div class="space-y-10">
     <section class="grid gap-6 lg:grid-cols-2">
-      <div class="p-6 border border-gray-200 rounded-lg dark:border-gray-800 bg-white dark:bg-gray-900">
+      <div
+        class="p-6 border border-gray-200 rounded-lg dark:border-gray-800 bg-white dark:bg-gray-900"
+      >
         <h2 class="text-xl font-semibold mb-2">Create a group</h2>
-        <p class="text-sm text-gray-500 mb-4">Start a shared workspace and generate an invite token.</p>
+        <p class="text-sm text-gray-500 mb-4">
+          Start a shared workspace and generate an invite token.
+        </p>
         <UFormField label="Group name" name="group">
-          <UInput v-model="groupName" placeholder="e.g. Household Budgets" />
+          <UInput
+            v-model="groupName"
+            placeholder="e.g. Household Budgets"
+            class="w-full"
+          />
         </UFormField>
         <div class="flex items-center gap-3 mt-4">
           <UButton
@@ -15,15 +23,26 @@
             label="Create group"
             @click="handleCreateGroup"
           />
-          <UBadge color="info" variant="subtle" v-if="inviteToken">Invite token ready</UBadge>
+          <UBadge color="info" variant="subtle" v-if="inviteToken"
+            >Invite token ready</UBadge
+          >
         </div>
-        <p v-if="inviteToken" class="text-xs text-gray-500 mt-2 font-mono break-all">{{ inviteToken }}</p>
+        <p
+          v-if="inviteToken"
+          class="text-xs text-gray-500 mt-2 font-mono break-all"
+        >
+          {{ inviteToken }}
+        </p>
       </div>
-      <div class="p-6 border border-gray-200 rounded-lg dark:border-gray-800 bg-white dark:bg-gray-900">
+      <div
+        class="p-6 border border-gray-200 rounded-lg dark:border-gray-800 bg-white dark:bg-gray-900"
+      >
         <h2 class="text-xl font-semibold mb-2">Join a group</h2>
-        <p class="text-sm text-gray-500 mb-4">Enter the invite token shared with you.</p>
+        <p class="text-sm text-gray-500 mb-4">
+          Enter the invite token shared with you.
+        </p>
         <UFormField label="Invite token" name="token">
-          <UInput v-model="joinToken" placeholder="Token" />
+          <UInput v-model="joinToken" placeholder="Token" class="w-full" />
         </UFormField>
         <UButton
           :loading="isJoining"
@@ -38,7 +57,9 @@
 
     <section class="space-y-3">
       <h2 class="text-2xl font-bold">My groups</h2>
-      <div v-if="!memberships.length" class="text-sm text-gray-500">No memberships yet.</div>
+      <div v-if="!memberships.length" class="text-sm text-gray-500">
+        No memberships yet.
+      </div>
       <div class="grid gap-4">
         <article
           v-for="group in memberships"
@@ -48,8 +69,12 @@
           <div class="flex items-center justify-between gap-3">
             <div class="min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
-                <p class="font-semibold text-lg">{{ group.name ?? "Unnamed group" }}</p>
-                <UBadge v-if="group.is_owner" color="warning" variant="subtle">Owner</UBadge>
+                <p class="font-semibold text-lg">
+                  {{ group.name ?? "Unnamed group" }}
+                </p>
+                <UBadge v-if="group.is_owner" color="warning" variant="subtle"
+                  >Owner</UBadge
+                >
               </div>
             </div>
             <div class="flex items-center gap-2 shrink-0">
@@ -72,16 +97,32 @@
             </div>
           </div>
           <p class="text-xs text-gray-500 mt-1">
-            Created {{ group.created_at ? new Date(group.created_at).toLocaleDateString() : "—" }}
+            Created
+            {{
+              group.created_at
+                ? new Date(group.created_at).toLocaleDateString()
+                : "—"
+            }}
           </p>
           <div
             v-if="group.is_owner"
             class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-800"
           >
-            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Invite token</p>
+            <p
+              class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2"
+            >
+              Invite token
+            </p>
             <template v-if="group.token">
-              <p class="text-xs font-mono break-all text-gray-700 dark:text-gray-300">{{ group.token }}</p>
-              <p v-if="group.invite_expires_at" class="text-xs text-gray-500 mt-1">
+              <p
+                class="text-xs font-mono break-all text-gray-700 dark:text-gray-300"
+              >
+                {{ group.token }}
+              </p>
+              <p
+                v-if="group.invite_expires_at"
+                class="text-xs text-gray-500 mt-1"
+              >
                 Expires {{ new Date(group.invite_expires_at).toLocaleString() }}
               </p>
               <div class="flex flex-wrap gap-2 mt-3">
@@ -105,7 +146,8 @@
               </div>
             </template>
             <p v-else class="text-xs text-gray-500">
-              No invite token loaded. Ensure your Supabase policy allows owners to read
+              No invite token loaded. Ensure your Supabase policy allows owners
+              to read
               <span class="font-mono">group_invites</span>
               for this group.
             </p>
@@ -121,10 +163,16 @@
           <span class="font-medium text-gray-900 dark:text-gray-100">{{
             groupPendingDelete?.name ?? "this group"
           }}</span>
-          , including invites, members, and all transactions stored for this group. This cannot be undone.
+          , including invites, members, and all transactions stored for this
+          group. This cannot be undone.
         </p>
         <div class="flex flex-wrap justify-end gap-2">
-          <UButton color="neutral" variant="outline" label="Cancel" @click="deleteModalOpen = false" />
+          <UButton
+            color="neutral"
+            variant="outline"
+            label="Cancel"
+            @click="deleteModalOpen = false"
+          />
           <UButton
             color="error"
             variant="solid"
@@ -214,7 +262,10 @@ const confirmDeleteGroup = async () => {
     isDeletingGroup.value = true;
     await deleteGroupAsOwner(id);
     memberships.value = memberships.value.filter((g) => g.id !== id);
-    toastSuccess({ title: "Group deleted", description: "The group and its data were removed." });
+    toastSuccess({
+      title: "Group deleted",
+      description: "The group and its data were removed.",
+    });
     deleteModalOpen.value = false;
     groupPendingDelete.value = null;
     await refresh(id);
@@ -226,13 +277,19 @@ const confirmDeleteGroup = async () => {
 };
 
 const canShare = computed(
-  () => import.meta.client && typeof navigator !== "undefined" && typeof navigator.share === "function",
+  () =>
+    import.meta.client &&
+    typeof navigator !== "undefined" &&
+    typeof navigator.share === "function",
 );
 
 const copyGroupToken = async (token) => {
   try {
     await navigator.clipboard.writeText(token);
-    toastSuccess({ title: "Copied", description: "Invite token copied to clipboard." });
+    toastSuccess({
+      title: "Copied",
+      description: "Invite token copied to clipboard.",
+    });
   } catch (error) {
     toastError({ title: "Copy failed", description: error.message });
   }
@@ -275,7 +332,10 @@ const handleCreateGroup = async () => {
     isCreating.value = true;
     const { invite } = await createGroupWithInvite(groupName.value.trim());
     inviteToken.value = invite.token;
-    toastSuccess({ title: "Group created", description: "Share this token with your collaborators." });
+    toastSuccess({
+      title: "Group created",
+      description: "Share this token with your collaborators.",
+    });
     groupName.value = "";
     refresh();
   } catch (error) {
@@ -294,7 +354,10 @@ const handleJoinGroup = async () => {
   try {
     isJoining.value = true;
     const data = await acceptInvite(joinToken.value.trim());
-    toastSuccess({ title: "Joined", description: "Now you can see the group finances" });
+    toastSuccess({
+      title: "Joined",
+      description: "Now you can see the group finances",
+    });
     joinToken.value = "";
     refresh();
   } catch (error) {

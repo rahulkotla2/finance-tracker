@@ -1,11 +1,20 @@
 <template>
-  <div class="grid grid-cols-3 py-4 border-b border-gray-200 dark:border-gray-800">
-    <div class="flex items-center justify-between col-span-2 space-x-4">
-      <div class="flex items-center space-x-2">
-        <UIcon :name="icon" :class="iconColor" />
-        <div>{{ transaction.description }}</div>
+  <div
+    class="grid grid-cols-1 gap-3 border-b border-gray-200 py-4 dark:border-gray-800 sm:grid-cols-3 sm:items-center sm:gap-4"
+  >
+    <div
+      class="flex min-w-0 flex-col gap-2 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+    >
+      <div class="flex min-w-0 items-start gap-2 sm:flex-1 sm:items-center">
+        <UIcon
+          :name="icon"
+          :class="[iconColor, 'mt-0.5 size-5 shrink-0 sm:mt-0']"
+        />
+        <div class="min-w-0 flex-1 break-words leading-snug">
+          {{ transaction.description }}
+        </div>
       </div>
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
         <UBadge color="neutral" variant="outline" v-if="transaction.category">
           {{ transaction.category }}
         </UBadge>
@@ -17,14 +26,18 @@
         </UBadge>
       </div>
     </div>
-    <div class="flex items-center justify-end space-x-2">
-      <div>{{ currency }}</div>
-      <div>
-        <UDropdownMenu :items="items" :popper="{ placement: 'bottom-start' }">
+    <div class="flex items-center justify-between gap-3 sm:justify-end sm:gap-2">
+      <div class="text-base font-medium tabular-nums sm:font-normal">
+        {{ currency }}
+      </div>
+      <div class="shrink-0">
+        <UDropdownMenu :items="items" :popper="{ placement: 'bottom-end' }">
           <UButton
             trailing-icon="i-heroicons-ellipsis-horizontal-solid"
             color="neutral"
             variant="ghost"
+            size="md"
+            class="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0"
             :loading="isLoading"
           />
           <TransactionModal
