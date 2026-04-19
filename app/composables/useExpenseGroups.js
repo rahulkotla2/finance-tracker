@@ -57,6 +57,42 @@ export function useExpenseGroups() {
     return { group, invite };
   }
 
+  /**
+   * Permanently removes a group. Only the active owner membership may run this.
+   * Deletes child rows in dependency order (transactions for this group, then invites,
+   * members, and the group row).
+   */
+  async function deleteGroupAsOwner(groupId) {
+    const { data: membership, error: membershipReadError } = await getMyGroupMembership(groupId);
+    if (membershipReadError) throw membershipReadError;
+    if (!membership || membership.role !== "owner") {
+      throw new Error("Only the group owner can delete this group.");
+    }
+
+    const { error: txError } = await supabase.from("transactions").delete().eq("group_id", groupId);
+    if (txError) throw txError;
+
+    const { error: invitesError } = await supabase.from("group_invites").delete().eq("group_id", groupId);
+    if (invitesError) throw invitesError;
+
+    const { error: membersError } = await supabase.from("group_members").delete().eq("group_id", groupId);
+    if (membersError) throw membersError;
+
+    const { data: removedGroup, error: groupError } = await supabase
+      .from("expense_groups")
+      .delete()
+      .eq("id", groupId)
+      .select("id")
+      .maybeSingle();
+
+    if (groupError) throw groupError;
+    if (!removedGroup?.id) {
+      throw new Error(
+        "The group was not removed (nothing deleted). Check that your database policies allow the owner to delete this group.",
+      );
+    }
+  }
+
   async function acceptInvite(token) {
     const trimmed = token?.trim();
     if (!trimmed) throw new Error("Invite token is required");
@@ -93,11 +129,27 @@ export function useExpenseGroups() {
       .order("created_at", { ascending: true });
   }
 
+  /** Latest row for this group (owner RLS should allow select on own groups). */
+  async function getLatestInviteForGroup(groupId) {
+    const { data, error } = await supabase
+      .from("group_invites")
+      .select("token, expires_at")
+      .eq("group_id", groupId)
+      .order("expires_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data ?? null;
+  }
+
   return {
     listMyMemberships,
     createGroupWithInvite,
     acceptInvite,
     getMyGroupMembership,
     listGroupMembers,
+    deleteGroupAsOwner,
+    getLatestInviteForGroup,
   };
 }

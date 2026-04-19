@@ -52,54 +52,103 @@
                 <UBadge v-if="group.is_owner" color="warning" variant="subtle">Owner</UBadge>
               </div>
             </div>
-            <NuxtLink
-              v-if="group.id"
-              :to="`/groups/${group.id}`"
-              class="text-sm font-medium shrink-0 text-blue-600 dark:text-blue-400"
-            >
-              View
-            </NuxtLink>
+            <div class="flex items-center gap-2 shrink-0">
+              <NuxtLink
+                v-if="group.id"
+                :to="`/groups/${group.id}`"
+                class="text-sm font-medium text-blue-600 dark:text-blue-400"
+              >
+                View
+              </NuxtLink>
+              <UButton
+                v-if="group.is_owner && group.id"
+                size="xs"
+                color="error"
+                variant="outline"
+                icon="i-heroicons-trash-20-solid"
+                aria-label="Delete group"
+                @click="openDeleteModal(group)"
+              />
+            </div>
           </div>
           <p class="text-xs text-gray-500 mt-1">
             Created {{ group.created_at ? new Date(group.created_at).toLocaleDateString() : "—" }}
           </p>
           <div
-            v-if="group.is_owner && group.token"
+            v-if="group.is_owner"
             class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-800"
           >
             <p class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Invite token</p>
-            <p class="text-xs font-mono break-all text-gray-700 dark:text-gray-300 mb-3">{{ group.token }}</p>
-            <div class="flex flex-wrap gap-2">
-              <UButton
-                size="xs"
-                color="neutral"
-                variant="outline"
-                icon="i-heroicons-clipboard-document"
-                label="Copy"
-                @click="copyGroupToken(group.token)"
-              />
-              <UButton
-                v-if="canShare"
-                size="xs"
-                color="neutral"
-                variant="outline"
-                icon="i-heroicons-share"
-                label="Share"
-                @click="shareGroupInvite(group)"
-              />
-            </div>
+            <template v-if="group.token">
+              <p class="text-xs font-mono break-all text-gray-700 dark:text-gray-300">{{ group.token }}</p>
+              <p v-if="group.invite_expires_at" class="text-xs text-gray-500 mt-1">
+                Expires {{ new Date(group.invite_expires_at).toLocaleString() }}
+              </p>
+              <div class="flex flex-wrap gap-2 mt-3">
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="outline"
+                  icon="i-heroicons-clipboard-document"
+                  label="Copy"
+                  @click="copyGroupToken(group.token)"
+                />
+                <UButton
+                  v-if="canShare"
+                  size="xs"
+                  color="neutral"
+                  variant="outline"
+                  icon="i-heroicons-share"
+                  label="Share"
+                  @click="shareGroupInvite(group)"
+                />
+              </div>
+            </template>
+            <p v-else class="text-xs text-gray-500">
+              No invite token loaded. Ensure your Supabase policy allows owners to read
+              <span class="font-mono">group_invites</span>
+              for this group.
+            </p>
           </div>
         </article>
       </div>
     </section>
+
+    <UModal v-model:open="deleteModalOpen" title="Delete group">
+      <template #body>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          This permanently deletes
+          <span class="font-medium text-gray-900 dark:text-gray-100">{{
+            groupPendingDelete?.name ?? "this group"
+          }}</span>
+          , including invites, members, and all transactions stored for this group. This cannot be undone.
+        </p>
+        <div class="flex flex-wrap justify-end gap-2">
+          <UButton color="neutral" variant="outline" label="Cancel" @click="deleteModalOpen = false" />
+          <UButton
+            color="error"
+            variant="solid"
+            label="Delete group"
+            :loading="isDeletingGroup"
+            @click="confirmDeleteGroup"
+          />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onActivated } from "vue";
 import { useExpenseGroups } from "~/composables/useExpenseGroups";
 
-const { listMyMemberships, createGroupWithInvite, acceptInvite } = useExpenseGroups();
+const {
+  listMyMemberships,
+  createGroupWithInvite,
+  acceptInvite,
+  deleteGroupAsOwner,
+  getLatestInviteForGroup,
+} = useExpenseGroups();
 const { toastSuccess, toastError } = useAppToast();
 
 const groupName = ref("");
@@ -108,6 +157,73 @@ const joinToken = ref("");
 const memberships = ref([]);
 const isCreating = ref(false);
 const isJoining = ref(false);
+const deleteModalOpen = ref(false);
+const groupPendingDelete = ref(null);
+const isDeletingGroup = ref(false);
+
+const openDeleteModal = (group) => {
+  groupPendingDelete.value = group;
+  deleteModalOpen.value = true;
+};
+
+const normalizeGroupsPayload = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === "object") return [payload];
+  return [];
+};
+
+/** Align RPC / view column names so the template always has id, is_owner, token, name. */
+const normalizeGroupRow = (raw) => {
+  if (!raw || typeof raw !== "object") return raw;
+  const id = raw.id ?? raw.group_id;
+  const token = raw.token ?? raw.invite_token ?? null;
+  const isOwner = Boolean(raw.is_owner ?? raw.isOwner ?? raw.role === "owner");
+  return {
+    ...raw,
+    id,
+    name: raw.name ?? raw.group_name ?? null,
+    is_owner: isOwner,
+    token,
+    created_at: raw.created_at ?? raw.createdAt ?? null,
+    invite_expires_at: raw.invite_expires_at ?? raw.expires_at ?? null,
+  };
+};
+
+const enrichOwnerInviteTokens = async (groups) => {
+  await Promise.all(
+    (groups ?? []).map(async (g) => {
+      if (!g?.id || !g.is_owner) return;
+      if (g.token && g.invite_expires_at) return;
+      try {
+        const inv = await getLatestInviteForGroup(g.id);
+        if (inv?.token) {
+          g.token = inv.token;
+          g.invite_expires_at = inv.expires_at ?? g.invite_expires_at;
+        }
+      } catch {
+        /* RLS or network — leave token empty */
+      }
+    }),
+  );
+};
+
+const confirmDeleteGroup = async () => {
+  const id = groupPendingDelete.value?.id;
+  if (!id) return;
+  try {
+    isDeletingGroup.value = true;
+    await deleteGroupAsOwner(id);
+    memberships.value = memberships.value.filter((g) => g.id !== id);
+    toastSuccess({ title: "Group deleted", description: "The group and its data were removed." });
+    deleteModalOpen.value = false;
+    groupPendingDelete.value = null;
+    await refresh(id);
+  } catch (error) {
+    toastError({ title: "Delete failed", description: error.message });
+  } finally {
+    isDeletingGroup.value = false;
+  }
+};
 
 const canShare = computed(
   () => import.meta.client && typeof navigator !== "undefined" && typeof navigator.share === "function",
@@ -135,13 +251,18 @@ const shareGroupInvite = async (group) => {
   }
 };
 
-const refresh = async () => {
+const refresh = async (omitGroupId = null) => {
   const { data, error } = await listMyMemberships();
   if (error) {
     toastError({ title: "Unable to read groups", description: error.message });
     return;
   }
-  memberships.value = data ?? [];
+  let list = normalizeGroupsPayload(data).map(normalizeGroupRow);
+  if (omitGroupId) {
+    list = list.filter((g) => g && g.id !== omitGroupId);
+  }
+  await enrichOwnerInviteTokens(list);
+  memberships.value = list;
 };
 
 const handleCreateGroup = async () => {
@@ -184,6 +305,10 @@ const handleJoinGroup = async () => {
 };
 
 onMounted(() => {
+  refresh();
+});
+
+onActivated(() => {
   refresh();
 });
 </script>
