@@ -70,12 +70,18 @@ export function useExpenseGroups() {
   }
 
   async function getMyGroupMembership(groupId) {
-    return supabase
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: null, error: new Error("Not authenticated") };
+
+    const { data, error } = await supabase
       .from("group_members")
       .select("id, role, status, expense_groups(id, name)")
       .eq("group_id", groupId)
+      .eq("user_id", user.id)
       .eq("status", "active")
       .maybeSingle();
+
+    return { data, error };
   }
 
   async function listGroupMembers(groupId) {

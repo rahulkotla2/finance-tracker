@@ -164,6 +164,7 @@ const { data: members, pending: membersPending } = await useAsyncData(
   async () => {
     if (!groupIdString.value) return [];
     const { data, error } = await listGroupMembers(groupIdString.value);
+    console.log(data);
     if (error) {
       console.error(error);
       return [];
