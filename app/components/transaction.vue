@@ -15,7 +15,14 @@
         </div>
       </div>
       <div class="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
-        <UBadge color="neutral" variant="outline" v-if="transaction.category">
+        <UBadge
+          v-if="creditLine && (transaction.type === 'Reserve' || transaction.type === 'Settle')"
+          :color="transaction.type === 'Reserve' ? 'success' : 'info'"
+          variant="subtle"
+        >
+          {{ transaction.type }}
+        </UBadge>
+        <UBadge color="neutral" variant="outline" v-else-if="transaction.category">
           {{ transaction.category }}
         </UBadge>
         <UBadge color="neutral" variant="subtle" v-if="showOwnerBadge && ownerLabel">
@@ -30,7 +37,7 @@
       <div class="text-base font-medium tabular-nums sm:font-normal">
         {{ currency }}
       </div>
-      <div class="shrink-0">
+      <div class="shrink-0" v-if="!isDemo">
         <UDropdownMenu :items="items" :popper="{ placement: 'bottom-end' }">
           <UButton
             trailing-icon="i-heroicons-ellipsis-horizontal-solid"
@@ -48,6 +55,7 @@
           />
         </UDropdownMenu>
       </div>
+      <div v-else class="shrink-0" aria-hidden="true" />
     </div>
   </div>
 </template>
@@ -70,6 +78,18 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  isDemo: {
+    type: Boolean,
+    default: false,
+  },
+  /**
+   * Only the credit card screen uses Reserve/Settle line types. Other pages
+   * keep the default Income/Expense/… presentation unchanged.
+   */
+  creditLine: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(["deleted", "edited"]);
@@ -77,11 +97,42 @@ const isOpen = ref(false);
 const { currency } = useCurrency(props.transaction.amount);
 const supabase = useSupabaseClient();
 
-const isIncome = computed(() => props.transaction.type === "Income");
-const icon = computed(() =>
-  isIncome.value ? "i-heroicons-arrow-up-right-solid" : "i-heroicons-arrow-down-left-solid",
+const isIncome = computed(
+  () => !props.creditLine && props.transaction.type === "Income",
 );
-const iconColor = computed(() => (isIncome.value ? "text-green-600" : "text-red-600"));
+
+const lineKind = computed(() => {
+  if (!props.creditLine) {
+    return isIncome.value ? "income" : "out";
+  }
+  const t = props.transaction.type;
+  if (t === "Reserve") return "reserve";
+  if (t === "Settle") return "settle";
+  if (t === "Income") return "income";
+  return "out";
+});
+
+const icon = computed(() => {
+  if (!props.creditLine) {
+    return isIncome.value
+      ? "i-heroicons-arrow-up-right-solid"
+      : "i-heroicons-arrow-down-left-solid";
+  }
+  const k = lineKind.value;
+  if (k === "income") return "i-heroicons-arrow-up-right-solid";
+  if (k === "reserve") return "i-heroicons-banknotes-20-solid";
+  if (k === "settle") return "i-heroicons-arrow-uturn-left-20-solid";
+  return "i-heroicons-arrow-down-left-20-solid";
+});
+const iconColor = computed(() => {
+  if (!props.creditLine) {
+    return isIncome.value ? "text-green-600" : "text-red-600";
+  }
+  const k = lineKind.value;
+  if (k === "out" || k === "expense") return "text-red-600";
+  if (k === "settle") return "text-blue-600 dark:text-blue-400";
+  return "text-green-600";
+});
 const groupName = computed(() => props.transaction.expense_groups?.name);
 
 const ownerLabel = computed(() => {

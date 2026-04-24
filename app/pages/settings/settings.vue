@@ -1,7 +1,7 @@
 <template>
     <UForm :state="state" :schema="schema" @submit.prevent="saveSettings">
       <UFormField label="Transaction View" name="transactionView" class="mb-4" help="Choose how you would like to view transactions">
-        <USelect v-model="state.transactionView" class="w-full" :items="transactionViewOptions"/>
+        <USelect v-model="state.transactionView" class="w-full" :items="transactionViewOptions" />
       </UFormField>
   
       <UButton type="submit" color="neutral" variant="solid" label="Save" :loading="pending" :disabled="pending" />

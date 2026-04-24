@@ -19,3 +19,6 @@ export const types = [
     'Investment',
     'Saving',
 ]
+
+/** Credit card group / demo: card spend, savings, partial pay to owner */
+export const creditCardLineTypes = ['Expense', 'Reserve', 'Settle']

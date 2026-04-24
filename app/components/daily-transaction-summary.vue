@@ -12,23 +12,35 @@
 <script setup>
 
 const props = defineProps({
-    date: {
-        type: String,
-        required: true
-    },
-    transactions: {
-        type: Array,
-        required: true
-    }
-})
+  date: {
+    type: String,
+    required: true,
+  },
+  transactions: {
+    type: Array,
+    required: true,
+  },
+  /** When true, Reserve/Settle count as inflows, Expense as outflow. */
+  creditLineNet: {
+    type: Boolean,
+    default: false,
+  },
+});
 
 const sum = computed(() => {
-    let sum = 0
-    
-    for(const transaction of props.transactions) {
-        transaction.type === 'Income' ? sum += transaction.amount : sum -= transaction.amount
+    let s = 0
+    for (const transaction of props.transactions) {
+        if (props.creditLineNet) {
+            if (transaction.type === 'Reserve' || transaction.type === 'Settle' || transaction.type === 'Income') {
+                s += transaction.amount
+            } else {
+                s -= transaction.amount
+            }
+        } else {
+            transaction.type === 'Income' ? s += transaction.amount : s -= transaction.amount
+        }
     }
-    return sum
+    return s
 })
 
 const { currency } = useCurrency(sum)

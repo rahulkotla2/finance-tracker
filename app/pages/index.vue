@@ -2,8 +2,9 @@
     <section class="flex items-center justify-between mb-10">
         <h1 class="text-4xl font-extrabold">Summary</h1>
         <div class="flex items-center gap-3">
+          <UButton color="primary" variant="solid" label="Groups" @click="goToGroups" />
+          <UButton color="primary" variant="solid" label="Cards" @click="goToCards" />
             <USelectMenu v-model="selectedView" :items="transactionViewOptions" />
-            <UButton color="primary" variant="solid" label="Groups" @click="goToGroups" />
         </div>
     </section>
     <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 sm:gap-16 mb-10">
@@ -64,6 +65,10 @@ const refreshData = () => {
 
 const goToGroups = () => {
   navigateTo("/groups");
+};
+
+const goToCards = () => {
+  navigateTo("/cards");
 };
 
 const {
