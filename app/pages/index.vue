@@ -1,5 +1,5 @@
 <template>
-    <section class="flex items-center justify-between mb-10">
+    <section class="flex items-center justify-between flex-wrap gap-4 mb-10">
         <h1 class="text-4xl font-extrabold">Summary</h1>
         <div class="flex items-center gap-3">
           <UButton color="primary" variant="solid" label="Groups" @click="goToGroups" />

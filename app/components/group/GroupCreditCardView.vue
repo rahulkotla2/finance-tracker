@@ -17,8 +17,8 @@
           <span class="font-medium">{{ memberDisplayName(owner) }}</span>
         </div>
       </div>
-      <div class="flex flex-wrap items-end justify-between gap-3 mt-2">
-        <div class="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
+      <div class="flex flex-wrap items-end justify-between gap-4 mt-2">
+        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-4">
           <UFormField name="memberFilter" label="Member" class="min-w-48">
             <USelectMenu
               v-model="memberFilterUserId"
@@ -409,7 +409,25 @@ const { data: cardRows, pending: cardsPending, refresh: refreshCards } =
     { watch: () => [props.groupId] },
   );
 
-const cycleMenuItems = computed(() => {
+const { data: rpcCycles, refresh: refreshCycles } = await useAsyncData(
+  () => `group-cycles-rpc-${props.groupId}-${selectedCardId.value ?? 'none'}`,
+  async () => {
+    if (!import.meta.client) return [];
+    if (!selectedCardId.value) return [];
+    const { data, error } = await supabase.rpc('get_group_cycles', {
+      p_group_id: props.groupId,
+      p_card_id: selectedCardId.value
+    });
+    if (error) {
+      console.error(error);
+      return [];
+    }
+    return (data ?? []).map(x => x.billing_cycle_key);
+  },
+  { watch: [() => props.groupId, selectedCardId] }
+);
+
+const allCycleMenuItems = computed(() => {
   if (!selectedCardId.value) {
     return listRecentBillingCycleKeyItems(20);
   }
@@ -425,6 +443,12 @@ const cycleMenuItems = computed(() => {
     20,
     new Date(),
   );
+});
+
+const cycleMenuItems = computed(() => {
+  const all = allCycleMenuItems.value;
+  const keys = new Set(rpcCycles.value ?? []);
+  return all.filter((item, index) => index === 0 || keys.has(item.id));
 });
 
 watch(
@@ -504,6 +528,7 @@ const txLoading = computed(() => pCur.value);
 const refreshData = () => {
   rCur();
   refreshCards();
+  refreshCycles();
 };
 
 const r2 = (n) => Math.round(n * 100) / 100;

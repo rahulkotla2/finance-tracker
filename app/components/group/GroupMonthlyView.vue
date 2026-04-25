@@ -16,7 +16,7 @@
         </div>
       </div>
       <div class="flex flex-wrap items-end justify-between gap-3 mt-2">
-        <div class="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
+        <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
           <UFormField name="memberFilter" label="Member" class="min-w-48">
             <USelectMenu
               v-model="memberFilterUserId"
@@ -167,6 +167,7 @@ const props = defineProps({
 });
 
 const user = useSupabaseUser();
+const supabase = useSupabaseClient();
 
 const isAddOpen = ref(false);
 const memberFilterUserId = ref("ALL");
@@ -257,13 +258,36 @@ const calendarMonthMenu = (() => {
   return out;
 })();
 
-const cycleMenuItems = computed(() => {
+const { data: rpcCycles, refresh: refreshCycles } = await useAsyncData(
+  () => `group-cycles-rpc-${props.groupId}`,
+  async () => {
+    if (!import.meta.client) return [];
+    const { data, error } = await supabase.rpc('get_group_cycles', {
+      p_group_id: props.groupId,
+      p_card_id: null
+    });
+    if (error) {
+      console.error(error);
+      return [];
+    }
+    return (data ?? []).map(x => x.billing_cycle_key);
+  },
+  { watch: [() => props.groupId] }
+);
+
+const allCycleMenuItems = computed(() => {
   if (hasConfiguredCycle.value) {
     const s = Math.floor(Number(props.cycleStartDay));
     const e = Math.floor(Number(props.cycleEndDay));
     return listCardStatementCycleMenuItems(s, e, 24, new Date());
   }
   return calendarMonthMenu;
+});
+
+const cycleMenuItems = computed(() => {
+  const all = allCycleMenuItems.value;
+  const keys = new Set(rpcCycles.value ?? []);
+  return all.filter((item, index) => index === 0 || keys.has(item.id));
 });
 
 watch(
@@ -309,6 +333,7 @@ const pending = computed(() => pendingCurrent.value);
 
 const refreshData = () => {
   refreshC();
+  refreshCycles();
 };
 
 const currentFiltered = computed(() =>

@@ -1,5 +1,13 @@
 <template>
   <div class="space-y-10">
+    <div>
+      <NuxtLink
+        to="/"
+        class="text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+      >
+        ← Summary
+      </NuxtLink>
+    </div>
 
     <section class="grid gap-6 lg:grid-cols-2">
       <div
