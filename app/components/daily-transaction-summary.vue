@@ -10,6 +10,7 @@
 </template>
 
 <script setup>
+import { isCcReserve, isCcPaymentToOwner } from "~/utils/creditCardTransaction";
 
 const props = defineProps({
   date: {
@@ -31,10 +32,11 @@ const sum = computed(() => {
     let s = 0
     for (const transaction of props.transactions) {
         if (props.creditLineNet) {
-            if (transaction.type === 'Reserve' || transaction.type === 'Settle' || transaction.type === 'Income') {
-                s += transaction.amount
+            const t = transaction
+            if (isCcReserve(t) || isCcPaymentToOwner(t) || t.type === "Income" || t.type === "Reserve" || t.type === "Settle") {
+                s += t.amount
             } else {
-                s -= transaction.amount
+                s -= t.amount
             }
         } else {
             transaction.type === 'Income' ? s += transaction.amount : s -= transaction.amount

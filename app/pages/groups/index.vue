@@ -1,5 +1,6 @@
 <template>
   <div class="space-y-10">
+
     <section class="grid gap-6 lg:grid-cols-2">
       <div
         class="p-6 border border-gray-200 rounded-lg dark:border-gray-800 bg-white dark:bg-gray-900"
@@ -15,6 +16,19 @@
             class="w-full"
           />
         </UFormField>
+        <UFormField
+          label="Group category"
+          name="groupCategory"
+          class="mt-4"
+        >
+          <USelectMenu
+            v-model="groupCategory"
+            value-key="value"
+            :items="groupCategoryItems"
+            placeholder="Select a category"
+            class="w-full max-w-md"
+          />
+        </UFormField>
         <div class="flex items-center gap-3 mt-4">
           <UButton
             :loading="isCreating"
@@ -23,16 +37,7 @@
             label="Create group"
             @click="handleCreateGroup"
           />
-          <UBadge color="info" variant="subtle" v-if="inviteToken"
-            >Invite token ready</UBadge
-          >
         </div>
-        <p
-          v-if="inviteToken"
-          class="text-xs text-gray-500 mt-2 font-mono break-all"
-        >
-          {{ inviteToken }}
-        </p>
       </div>
       <div
         class="p-6 border border-gray-200 rounded-lg dark:border-gray-800 bg-white dark:bg-gray-900"
@@ -75,6 +80,9 @@
                 <UBadge v-if="group.is_owner" color="warning" variant="subtle"
                   >Owner</UBadge
                 >
+                <UBadge v-if="groupCategoryLabel(group)" color="neutral" variant="subtle">
+                  {{ groupCategoryLabel(group) }}
+                </UBadge>
               </div>
             </div>
             <div class="flex items-center gap-2 shrink-0">
@@ -156,6 +164,102 @@
       </div>
     </section>
 
+    <UModal v-model:open="groupCreatedModalOpen" title="Group created" class="sm:max-w-md">
+      <template #body>
+        <div v-if="groupCreated" class="space-y-4">
+          <dl class="space-y-2 text-sm">
+            <div class="flex flex-wrap items-baseline gap-2">
+              <dt class="shrink-0 text-gray-500 dark:text-gray-400">Name</dt>
+              <dd class="min-w-0 font-medium text-gray-900 dark:text-white">
+                {{ groupCreated.name }}
+              </dd>
+            </div>
+            <div class="flex flex-wrap items-baseline gap-2">
+              <dt class="shrink-0 text-gray-500 dark:text-gray-400">Category</dt>
+              <dd>
+                <UBadge v-if="groupCategoryLabel(groupCreated)" color="neutral" variant="subtle">
+                  {{ groupCategoryLabel(groupCreated) }}
+                </UBadge>
+                <span v-else class="text-gray-600 dark:text-gray-300">—</span>
+              </dd>
+            </div>
+            <div>
+              <dt class="text-gray-500 dark:text-gray-400">Invite token</dt>
+              <dd
+                class="mt-1 break-all rounded-md bg-gray-50 p-2.5 font-mono text-xs text-gray-800 dark:bg-gray-800/80 dark:text-gray-200"
+              >
+                {{ groupCreated.token }}
+              </dd>
+            </div>
+          </dl>
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              color="neutral"
+              variant="outline"
+              icon="i-heroicons-clipboard-document"
+              label="Copy token"
+              @click="copyGroupToken(groupCreated.token)"
+            />
+            <UButton
+              v-if="canShare"
+              color="neutral"
+              variant="solid"
+              icon="i-heroicons-share"
+              label="Share"
+              @click="shareGroupInvite({ name: groupCreated.name, token: groupCreated.token })"
+            />
+          </div>
+          <div class="flex justify-end border-t border-gray-200 pt-3 dark:border-gray-800">
+            <UButton
+              color="neutral"
+              variant="solid"
+              label="Done"
+              @click="closeGroupCreatedModal"
+            />
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="monthlyModalOpen" title="Monthly cycle (days)">
+      <template #body>
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          Day of the month (1–31) only, same as credit card billing. Repeats every month.
+        </p>
+        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+          <UFormField
+            label="Cycle start (day)"
+            name="modalCycleStartDay"
+          >
+            <DayOfMonthPicker v-model="modalCycleStartDay" title="Start" />
+          </UFormField>
+          <UFormField
+            label="Cycle end (day)"
+            name="modalCycleEndDay"
+          >
+            <DayOfMonthPicker v-model="modalCycleEndDay" title="End" />
+          </UFormField>
+        </div>
+        <div class="mt-4 flex flex-wrap justify-end gap-2">
+          <UButton
+            color="neutral"
+            variant="outline"
+            label="Cancel"
+            :disabled="isCreating"
+            @click="monthlyModalOpen = false"
+          />
+          <UButton
+            color="neutral"
+            variant="solid"
+            label="Create group"
+            :loading="isCreating"
+            :disabled="isCreating"
+            @click="confirmMonthlyGroup"
+          />
+        </div>
+      </template>
+    </UModal>
+
     <UModal v-model:open="deleteModalOpen" title="Delete group">
       <template #body>
         <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -187,8 +291,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated } from "vue";
+import { ref, computed, watch, onMounted, onActivated } from "vue";
 import { useExpenseGroups } from "~/composables/useExpenseGroups";
+import { expenseGroupCategoryOptions } from "~/constants";
 
 const {
   listMyMemberships,
@@ -199,8 +304,27 @@ const {
 } = useExpenseGroups();
 const { toastSuccess, toastError } = useAppToast();
 
+const groupCategoryItems = expenseGroupCategoryOptions;
+
 const groupName = ref("");
-const inviteToken = ref("");
+/** USelectMenu may set the value string or a selected item object depending on Nuxt UI version. */
+const groupCategory = ref(null);
+const monthlyModalOpen = ref(false);
+const modalCycleStartDay = ref(1);
+const modalCycleEndDay = ref(1);
+
+const selectedCategory = computed(() => {
+  const g = groupCategory.value;
+  if (g == null) return null;
+  if (typeof g === "string") return g;
+  if (typeof g === "object" && "value" in g && g.value) return g.value;
+  return null;
+});
+
+const isMonthlyGroup = computed(() => selectedCategory.value === "monthly");
+
+const groupCreatedModalOpen = ref(false);
+const groupCreated = ref(null);
 const joinToken = ref("");
 const memberships = ref([]);
 const isCreating = ref(false);
@@ -226,16 +350,27 @@ const normalizeGroupRow = (raw) => {
   const id = raw.id ?? raw.group_id;
   const token = raw.token ?? raw.invite_token ?? null;
   const isOwner = Boolean(raw.is_owner ?? raw.isOwner ?? raw.role === "owner");
+  const groupType = raw.type ?? raw.category ?? null;
   return {
     ...raw,
     id,
     name: raw.name ?? raw.group_name ?? null,
+    type: groupType,
+    category: groupType,
     is_owner: isOwner,
     token,
     created_at: raw.created_at ?? raw.createdAt ?? null,
     invite_expires_at: raw.invite_expires_at ?? raw.expires_at ?? null,
   };
 };
+
+function groupCategoryLabel(group) {
+  const c = group?.type ?? group?.category;
+  if (!c) return null;
+  return (
+    groupCategoryItems.find((o) => o.value === c)?.label ?? null
+  );
+}
 
 const enrichOwnerInviteTokens = async (groups) => {
   await Promise.all(
@@ -322,26 +457,69 @@ const refresh = async (omitGroupId = null) => {
   memberships.value = list;
 };
 
+const closeGroupCreatedModal = () => {
+  groupCreatedModalOpen.value = false;
+};
+
+watch(groupCreatedModalOpen, (open) => {
+  if (!open) {
+    groupCreated.value = null;
+  }
+});
+
+/** @returns {Promise<boolean>} */
+const runCreateGroup = async (options) => {
+  isCreating.value = true;
+  try {
+    const { group, invite } = await createGroupWithInvite(
+      groupName.value.trim(),
+      selectedCategory.value,
+      options,
+    );
+    groupCreated.value = {
+      name: group.name,
+      type: group.type,
+      token: invite.token,
+    };
+    groupCreatedModalOpen.value = true;
+    groupName.value = "";
+    groupCategory.value = null;
+    await refresh();
+    return true;
+  } catch (error) {
+    toastError({ title: "Creation failed", description: error.message });
+    return false;
+  } finally {
+    isCreating.value = false;
+  }
+};
+
 const handleCreateGroup = async () => {
   if (!groupName.value.trim()) {
     toastError({ title: "Give the group a name" });
     return;
   }
+  if (!selectedCategory.value) {
+    toastError({ title: "Select a group category" });
+    return;
+  }
+  if (isMonthlyGroup.value) {
+    modalCycleStartDay.value = 1;
+    modalCycleEndDay.value = 1;
+    monthlyModalOpen.value = true;
+    return;
+  }
+  await runCreateGroup(undefined);
+};
 
-  try {
-    isCreating.value = true;
-    const { invite } = await createGroupWithInvite(groupName.value.trim());
-    inviteToken.value = invite.token;
-    toastSuccess({
-      title: "Group created",
-      description: "Share this token with your collaborators.",
-    });
-    groupName.value = "";
-    refresh();
-  } catch (error) {
-    toastError({ title: "Creation failed", description: error.message });
-  } finally {
-    isCreating.value = false;
+const confirmMonthlyGroup = async () => {
+  if (!isMonthlyGroup.value) return;
+  const ok = await runCreateGroup({
+    monthlyCycleStartDay: modalCycleStartDay.value,
+    monthlyCycleEndDay: modalCycleEndDay.value,
+  });
+  if (ok) {
+    monthlyModalOpen.value = false;
   }
 };
 

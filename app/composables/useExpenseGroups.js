@@ -16,14 +16,34 @@ export function useExpenseGroups() {
     return supabase.rpc("get_user_groups");
   }
 
-  async function createGroupWithInvite(name) {
+  /**
+   * @param {string} name
+   * @param {"credit_card"|"monthly"|"other"} type
+   * @param {object} [options]
+   * @param {number} [options.monthlyCycleStartDay]  1–31, `type === "monthly"` only
+   * @param {number} [options.monthlyCycleEndDay]   1–31, `type === "monthly"` only
+   */
+  async function createGroupWithInvite(name, type, options = {}) {
+    const row = { name, type };
+
+    if (type === "monthly") {
+      if (options.monthlyCycleStartDay == null || options.monthlyCycleEndDay == null) {
+        throw new Error("Monthly groups require a cycle start day and cycle end day (1–31).");
+      }
+      const s = Math.floor(Number(options.monthlyCycleStartDay));
+      const e = Math.floor(Number(options.monthlyCycleEndDay));
+      if (!Number.isFinite(s) || s < 1 || s > 31 || !Number.isFinite(e) || e < 1 || e > 31) {
+        throw new Error("Cycle start and end must be days of the month from 1 to 31.");
+      }
+      row.cycle_start_day = s;
+      row.cycle_end_day = e;
+    }
+
     const { data: group, error: groupError } = await supabase
       .from("expense_groups")
-      .insert({ name })
-      .select("id, name")
+      .insert(row)
+      .select("id, name, type, cycle_start_day, cycle_end_day")
       .single();
-
-    console.log(groupError);
 
     if (groupError) throw groupError;
 
@@ -111,7 +131,7 @@ export function useExpenseGroups() {
 
     const { data, error } = await supabase
       .from("group_members")
-      .select("id, role, status, expense_groups(id, name)")
+      .select("id, role, status, expense_groups(id, name, type, cycle_start_day, cycle_end_day)")
       .eq("group_id", groupId)
       .eq("user_id", user.id)
       .eq("status", "active")

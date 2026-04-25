@@ -5,6 +5,7 @@ export const useRedirectedIfAuthenticated = (url = "/") => {
     user,
     (user) => {
       if (user) {
+        console.log(user);
         return navigateTo(url);
       }
     },

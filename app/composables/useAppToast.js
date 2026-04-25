@@ -18,5 +18,13 @@ export const useAppToast = () => {
         color: "error",
       });
     },
+    toastWarning: ({ title, description = null }) => {
+      toast.add({
+        title,
+        description,
+        icon: "i-heroicons-exclamation-triangle-solid",
+        color: "warning",
+      });
+    },
   };
 };

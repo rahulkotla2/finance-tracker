@@ -10,6 +10,7 @@ export const categories = [
     'Housing',
     'Utilities',
     'Entertainment',
+    'Credit card',
     'Other',
 ]
 
@@ -20,5 +21,19 @@ export const types = [
     'Saving',
 ]
 
-/** Credit card group / demo: card spend, savings, partial pay to owner */
-export const creditCardLineTypes = ['Expense', 'Reserve', 'Settle']
+/**
+ * Credit card form: spend → DB `type: expense`, subtype null; reserve → `subtype: reserve`;
+ * payment to owner → `subtype: payment`
+ */
+export const creditCardLineOptions = [
+  { value: "spend", label: "Card spend" },
+  { value: "reserve", label: "Reserve" },
+  { value: "payment", label: "Payment to owner" },
+];
+
+/** New shared expense group: purpose of the group (expense_groups.type) */
+export const expenseGroupCategoryOptions = [
+  { value: 'credit_card', label: 'Credit card' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'other', label: 'Other' },
+]

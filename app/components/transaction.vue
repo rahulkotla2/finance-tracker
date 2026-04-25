@@ -1,7 +1,22 @@
 <template>
   <div
-    class="grid grid-cols-1 gap-3 border-b border-gray-200 py-4 dark:border-gray-800 sm:grid-cols-3 sm:items-center sm:gap-4"
+    class="flex gap-3 border-b border-gray-200 py-4 dark:border-gray-800 sm:items-center sm:gap-4"
   >
+    <div
+      v-if="showSpendPickCheckbox"
+      class="flex shrink-0 items-start self-start rounded-md border-2 border-primary-500/70 bg-primary-50/90 p-2 shadow-sm dark:border-primary-400/60 dark:bg-primary-950/60 sm:items-center sm:self-center"
+    >
+      <UCheckbox
+        color="primary"
+        size="md"
+        :model-value="creditSpendSelected"
+        aria-label="Select this card line for combined savings"
+        @update:model-value="(v) => emit('toggleCreditSpendSelect', Boolean(v))"
+      />
+    </div>
+    <div
+      class="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-3 sm:items-center sm:gap-4"
+    >
     <div
       class="flex min-w-0 flex-col gap-2 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
     >
@@ -16,13 +31,16 @@
       </div>
       <div class="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
         <UBadge
-          v-if="creditLine && (transaction.type === 'Reserve' || transaction.type === 'Settle')"
-          :color="transaction.type === 'Reserve' ? 'success' : 'info'"
+          v-if="creditLine && showReserveOrPayment"
+          :color="ccReserve ? 'success' : 'info'"
           variant="subtle"
         >
-          {{ transaction.type }}
+          {{ ccReserve ? "reserve" : "payment" }}
         </UBadge>
-        <UBadge color="neutral" variant="outline" v-else-if="transaction.category">
+        <UBadge color="neutral" variant="outline" v-else-if="transaction.category && creditLine && !showReserveOrPayment">
+          {{ transaction.category }}
+        </UBadge>
+        <UBadge color="neutral" variant="outline" v-else-if="!creditLine && transaction.category">
           {{ transaction.category }}
         </UBadge>
         <UBadge color="neutral" variant="subtle" v-if="showOwnerBadge && ownerLabel">
@@ -50,6 +68,12 @@
           <TransactionModal
             :transaction="transaction"
             :group-id="transaction.group_id ?? groupId"
+            :group-owner-user-id="groupOwnerUserId"
+            :credit-card="creditLine"
+            :credit-card-id="creditCardId"
+            :billing-cycle-key="billingCycleKey"
+            :card-billing-cycle-start-day="cardBillingCycleStartDay"
+            :card-billing-cycle-end-day="cardBillingCycleEndDay"
             @saved="emit('edited')"
             v-model:isOpen="isOpen"
           />
@@ -57,10 +81,13 @@
       </div>
       <div v-else class="shrink-0" aria-hidden="true" />
     </div>
+    </div>
   </div>
 </template>
 
 <script setup>
+import { isCcReserve, isCcPaymentToOwner, isCcSpend } from "~/utils/creditCardTransaction";
+
 const props = defineProps({
   transaction: {
     type: Object,
@@ -90,9 +117,23 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  /** When editing a credit line from a group, pass through for save payload */
+  creditCardId: { type: String, default: null },
+  billingCycleKey: { type: String, default: null },
+  cardBillingCycleStartDay: { type: [Number, String], default: null },
+  cardBillingCycleEndDay: { type: [Number, String], default: null },
+  /** Card owner must not add “Payment to owner” (members pay the owner) */
+  groupOwnerUserId: { type: String, default: null },
+  /**
+   * Optional map `user_id` → display name (e.g. from group members) when `profiles` is not on the row.
+   */
+  memberNamesByUserId: { type: Object, default: null },
+  /** Credit card view: when true, show a checkbox on plain card spend rows only. */
+  pickSpendForReserveMode: { type: Boolean, default: false },
+  creditSpendSelected: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(["deleted", "edited"]);
+const emit = defineEmits(["deleted", "edited", "toggleCreditSpendSelect"]);
 const isOpen = ref(false);
 const { currency } = useCurrency(props.transaction.amount);
 const supabase = useSupabaseClient();
@@ -101,14 +142,28 @@ const isIncome = computed(
   () => !props.creditLine && props.transaction.type === "Income",
 );
 
+const ccReserve = computed(() => isCcReserve(props.transaction));
+const showReserveOrPayment = computed(
+  () => ccReserve.value || isCcPaymentToOwner(props.transaction),
+);
+
+/** Card spend only — not reserve, not payment-to-owner; any member’s line in this list. */
+const showSpendPickCheckbox = computed(() => {
+  if (!props.pickSpendForReserveMode || !props.creditLine) return false;
+  const t = props.transaction;
+  if (isCcReserve(t) || isCcPaymentToOwner(t)) return false;
+  return isCcSpend(t);
+});
+
 const lineKind = computed(() => {
   if (!props.creditLine) {
     return isIncome.value ? "income" : "out";
   }
-  const t = props.transaction.type;
-  if (t === "Reserve") return "reserve";
-  if (t === "Settle") return "settle";
-  if (t === "Income") return "income";
+  if (isCcReserve(props.transaction)) return "reserve";
+  if (isCcPaymentToOwner(props.transaction)) return "settle";
+  if (isCcSpend(props.transaction) || props.transaction.type === "Expense")
+    return "out";
+  if (props.transaction.type === "Income") return "income";
   return "out";
 });
 
@@ -135,12 +190,20 @@ const iconColor = computed(() => {
 });
 const groupName = computed(() => props.transaction.expense_groups?.name);
 
+function fullNameFromProfiles(p) {
+  if (!p) return null;
+  if (Array.isArray(p)) return p[0]?.full_name ?? null;
+  return p.full_name ?? null;
+}
+
 const ownerLabel = computed(() => {
-  const p = props.transaction.profiles;
-  const name = Array.isArray(p) ? p[0]?.full_name : p?.full_name;
-  if (name) return name;
+  const fromJoin = fullNameFromProfiles(props.transaction.profiles);
+  if (fromJoin) return fromJoin;
   const uid = props.transaction.user_id;
-  if (uid && typeof uid === "string") return `…${uid.slice(-6)}`;
+  if (uid && props.memberNamesByUserId && props.memberNamesByUserId[uid]) {
+    return props.memberNamesByUserId[uid];
+  }
+  if (uid && typeof uid === "string") return `Member …${uid.slice(-6)}`;
   return null;
 });
 

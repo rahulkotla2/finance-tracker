@@ -45,6 +45,8 @@ export const useFetchTransactions = async (period, options = {}) => {
 
       if (scope === "group") {
         query = query.eq("group_id", gid);
+      } else if (scope === "mine") {
+        query = query.is("group_id", null);
       }
 
       const { data, error } = await query;

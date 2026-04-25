@@ -44,29 +44,25 @@
       <Trend
         color="red"
         title="Total Spends"
-        :amount="allMembersView.current.spent"
-        :last-amount="allMembersView.previous.spent"
+        :amount="allMembersView.spent"
         :loading="false"
       />
       <Trend
-        color="green"
+        :color="allMembersView.saved < 0 ? 'text-amber-600 dark:text-amber-400' : 'green'"
         title="Total Saved"
-        :amount="allMembersView.current.saved"
-        :last-amount="allMembersView.previous.saved"
+        :amount="allMembersView.saved"
         :loading="false"
       />
       <Trend
         color="green"
         title="Available to Repay"
-        :amount="allMembersView.current.availableToPayCard"
-        :last-amount="allMembersView.previous.availableToPayCard"
+        :amount="allMembersView.availableToPayCard"
         :loading="false"
       />
       <Trend
         color="red"
         title="Debt (spent - saved)"
-        :amount="allMembersView.current.debtDepth"
-        :last-amount="allMembersView.previous.debtDepth"
+        :amount="allMembersView.debtDepth"
         :loading="false"
       />
     </section>
@@ -79,29 +75,25 @@
       <Trend
         color="red"
         title="Your Spends"
-        :amount="ownerAsMemberView.current.mySpent"
-        :last-amount="ownerAsMemberView.previous.mySpent"
+        :amount="ownerAsMemberView.mySpent"
         :loading="false"
       />
       <Trend
-        color="green"
+        :color="ownerAsMemberView.mySaved < 0 ? 'text-amber-600 dark:text-amber-400' : 'green'"
         title="Your Savings"
-        :amount="ownerAsMemberView.current.mySaved"
-        :last-amount="ownerAsMemberView.previous.mySaved"
+        :amount="ownerAsMemberView.mySaved"
         :loading="false"
       />
       <Trend
         color="text-amber-600 dark:text-amber-400"
         title="Due from Others"
-        :amount="ownerAsMemberView.current.shouldGetFromOthers"
-        :last-amount="ownerAsMemberView.previous.shouldGetFromOthers"
+        :amount="ownerAsMemberView.shouldGetFromOthers"
         :loading="false"
       />
       <Trend
         color="green"
         title="Received from Others"
-        :amount="ownerAsMemberView.current.gotFromOthers"
-        :last-amount="ownerAsMemberView.previous.gotFromOthers"
+        :amount="ownerAsMemberView.gotFromOthers"
         :loading="false"
       />
     </section>
@@ -114,29 +106,25 @@
       <Trend
         color="red"
         title="Expenses"
-        :amount="nonOwnerView.current.spent"
-        :last-amount="nonOwnerView.previous.spent"
+        :amount="nonOwnerView.spent"
         :loading="false"
       />
       <Trend
-        color="green"
+        :color="nonOwnerView.saved < 0 ? 'text-amber-600 dark:text-amber-400' : 'green'"
         title="Savings"
-        :amount="nonOwnerView.current.saved"
-        :last-amount="nonOwnerView.previous.saved"
+        :amount="nonOwnerView.saved"
         :loading="false"
       />
       <Trend
         color="green"
         title="Paid"
-        :amount="nonOwnerView.current.paidToOwner"
-        :last-amount="nonOwnerView.previous.paidToOwner"
+        :amount="nonOwnerView.paidToOwner"
         :loading="false"
       />
       <Trend
         color="red"
         title="Owed"
-        :amount="nonOwnerView.current.stillOwesOwner"
-        :last-amount="nonOwnerView.previous.stillOwesOwner"
+        :amount="nonOwnerView.stillOwesOwner"
         :loading="false"
       />
     </section>
@@ -216,6 +204,7 @@ import {
   startOfDay,
   subMonths,
 } from "date-fns";
+import { isCcSpend } from "~/utils/creditCardTransaction";
 import {
   groupTransactionsByDate,
   filterTransactionsByUserId,
@@ -337,7 +326,8 @@ const rawDemoTransactions = computed(() => {
   return [
     {
       id: `${cid}-t1`,
-      type: "Expense",
+      type: "expense",
+      subtype: null,
       amount: 89.2,
       description: "Groceries (split)",
       created_at: `${ymd(d1)}T10:00:00`,
@@ -348,7 +338,8 @@ const rawDemoTransactions = computed(() => {
     },
     {
       id: `${cid}-t2`,
-      type: "Expense",
+      type: "expense",
+      subtype: null,
       amount: 45,
       description: "Transit",
       created_at: `${ymd(d2)}T11:20:00`,
@@ -359,7 +350,8 @@ const rawDemoTransactions = computed(() => {
     },
     {
       id: `${cid}-t3`,
-      type: "Expense",
+      type: "expense",
+      subtype: null,
       amount: 312.5,
       description: "Utilities & housing share",
       created_at: `${ymd(d3)}T09:15:00`,
@@ -370,7 +362,8 @@ const rawDemoTransactions = computed(() => {
     },
     {
       id: `${cid}-t4`,
-      type: "Expense",
+      type: "expense",
+      subtype: null,
       amount: 128.99,
       description: "Dinner (group)",
       created_at: `${ymd(d4)}T20:00:00`,
@@ -381,7 +374,8 @@ const rawDemoTransactions = computed(() => {
     },
     {
       id: `${cid}-r1`,
-      type: "Reserve",
+      type: "expense",
+      subtype: "reserve",
       amount: 50,
       description: "Savings for card (Jordan)",
       created_at: `${ymd(d2)}T14:00:00`,
@@ -391,7 +385,8 @@ const rawDemoTransactions = computed(() => {
     },
     {
       id: `${cid}-s1`,
-      type: "Settle",
+      type: "expense",
+      subtype: "payment",
       amount: 35,
       description: "Partial pay to owner",
       created_at: `${ymd(d1)}T16:00:00`,
@@ -404,7 +399,7 @@ const rawDemoTransactions = computed(() => {
 
 const cardNudge = computed(() => (selectedCardId.value === "card-2" ? 0.4 : 1));
 
-/** Deterministic 0.85–1.1 from cycle id (stable “vs last period” story) */
+/** Deterministic 0.85–1.1 from cycle id (stable scaling for demo numbers) */
 function strHash(s) {
   let h = 0;
   for (let i = 0; i < s.length; i += 1)
@@ -416,13 +411,6 @@ const scaleForCycle = (id) =>
   0.86 + 0.24 * strHash(`cc-${id}-${selectedCardId.value}`);
 
 const r2 = (n) => Math.round(n * 100) / 100;
-const toPrevious = (obj, r = 0.93) => {
-  const out = {};
-  for (const k of Object.keys(obj)) {
-    out[k] = r2((obj[k] ?? 0) * r);
-  }
-  return out;
-};
 
 /** Total the owner should get back from other members (their share) this period */
 const totalDueFromNonOwners = computed(() => {
@@ -460,7 +448,7 @@ const settlementRows = computed(() => {
 const byUserSpent = computed(() => {
   const map = { [ownerId]: 0, [jordanId]: 0, [samId]: 0 };
   for (const t of rawDemoTransactions.value ?? []) {
-    if (t.type === "Expense" && t.user_id) {
+    if (isCcSpend(t) && t.user_id) {
       map[t.user_id] = (map[t.user_id] ?? 0) + t.amount;
     }
   }
@@ -489,29 +477,26 @@ const allMembersView = computed(() => {
   const availableToPayCard = r2((sv[ownerId] ?? 0) + fromOthers);
   const spent = r2(s[ownerId] + s[jordanId] + s[samId]);
   const saved = r2(sv[ownerId] + sv[jordanId] + sv[samId]);
-  const current = {
+  return {
     spent,
     saved,
     availableToPayCard,
-    // Shortfall: group spent less group saved is negative = surplus; positive = "depth"
-    debtDepth: r2(spent - saved),
+    debtDepth: r2(spent - Math.max(0, saved)),
   };
-  return { current, previous: toPrevious(current) };
 });
 
 const ownerAsMemberView = computed(() => {
   const s = byUserSpent.value;
   const sv = byUserSaved.value;
   const rows = settlementRows.value;
-  const shouldGetFromOthers = r2(rows.reduce((a, b) => a + b.owed, 0));
+  const shouldGetFromOthers = r2(rows.reduce((a, b) => a + b.pending, 0));
   const gotFromOthers = r2(rows.reduce((a, b) => a + b.paid, 0));
-  const current = {
+  return {
     mySpent: r2(s[ownerId] ?? 0),
     mySaved: r2(sv[ownerId] ?? 0),
     shouldGetFromOthers,
     gotFromOthers,
   };
-  return { current, previous: toPrevious(current) };
 });
 
 const nonOwnerView = computed(() => {
@@ -519,13 +504,12 @@ const nonOwnerView = computed(() => {
   const s = byUserSpent.value;
   const sv = byUserSaved.value;
   const row = settlementRows.value.find((r) => r.userId === id);
-  const current = {
+  return {
     spent: r2(s[id] ?? 0),
     saved: r2(sv[id] ?? 0),
     paidToOwner: r2(row?.paid ?? 0),
     stillOwesOwner: r2(row?.pending ?? 0),
   };
-  return { current, previous: toPrevious(current) };
 });
 
 const filteredList = computed(() => {
