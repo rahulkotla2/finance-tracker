@@ -39,23 +39,48 @@ export function useExpenseGroups() {
       row.cycle_end_day = e;
     }
 
-    const { data: group, error: groupError } = await supabase
-      .from("expense_groups")
-      .insert(row)
-      .select("id, name, type, cycle_start_day, cycle_end_day")
-      .single();
+    let group;
 
-    if (groupError) throw groupError;
-
-    const { error: membershipError } = await supabase
-      .from("group_members")
-      .insert({
-        group_id: group.id,
-        role: "owner",
-        status: "active",
+    if (type === "credit_card") {
+      const { data: rpcData, error: rpcError } = await supabase.rpc("create_credit_group", {
+        p_name: name,
       });
 
-    if (membershipError) throw membershipError;
+      if (rpcError) throw rpcError;
+
+      const newGroupId = rpcData?.id || rpcData;
+      if (!newGroupId) {
+        throw new Error("Failed to retrieve new group ID from create_credit_group RPC.");
+      }
+
+      const { data: fetchedGroup, error: fetchError } = await supabase
+        .from("expense_groups")
+        .select("id, name, type, cycle_start_day, cycle_end_day")
+        .eq("id", newGroupId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      group = fetchedGroup;
+    } else {
+      const { data: newGroup, error: groupError } = await supabase
+        .from("expense_groups")
+        .insert(row)
+        .select("id, name, type, cycle_start_day, cycle_end_day")
+        .single();
+
+      if (groupError) throw groupError;
+      group = newGroup;
+
+      const { error: membershipError } = await supabase
+        .from("group_members")
+        .insert({
+          group_id: group.id,
+          role: "owner",
+          status: "active",
+        });
+
+      if (membershipError) throw membershipError;
+    }
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + INVITE_EXPIRY_DAYS);
@@ -117,12 +142,22 @@ export function useExpenseGroups() {
     const trimmed = token?.trim();
     if (!trimmed) throw new Error("Invite token is required");
 
-    const { data, error } = await supabase.rpc("accept_group_invite", {
-      invite_token: trimmed,
+    const { data: invite, error: inviteError } = await supabase
+      .from("group_invites")
+      .select("group_id")
+      .eq("token", trimmed)
+      .single();
+
+    if (inviteError || !invite) {
+      throw new Error("Invalid or expired invite token");
+    }
+
+    const { error } = await supabase.rpc("join_group", {
+      p_group_id: invite.group_id,
     });
 
     if (error) throw error;
-    return data;
+    return true;
   }
 
   async function getMyGroupMembership(groupId) {

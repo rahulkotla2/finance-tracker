@@ -3,15 +3,28 @@
     <div class="flex items-center gap-6">
       <NuxtLink to="/" class="text-2xl font-bold tracking-tight">Finance Tracker</NuxtLink>
     </div>
-    <UDropdownMenu
-      :items="items"
-      :ui="{ item: { disabled: 'cursor-text select-text' }, width: 'w-64' }"
-      v-if="user"
-    >
-      <UAvatar
-        :src="avatarUrl"
-        alt="Avatar"
-      />
+    <div class="flex items-center gap-3">
+      <ClientOnly>
+        <UButton
+          :icon="isDark ? 'i-heroicons-moon-20-solid' : 'i-heroicons-sun-20-solid'"
+          color="neutral"
+          variant="ghost"
+          aria-label="Theme"
+          @click="isDark = !isDark"
+        />
+        <template #fallback>
+          <div class="w-8 h-8" />
+        </template>
+      </ClientOnly>
+      <UDropdownMenu
+        :items="items"
+        :ui="{ item: { disabled: 'cursor-text select-text' }, width: 'w-64' }"
+        v-if="user"
+      >
+        <UAvatar
+          :src="avatarUrl"
+          alt="Avatar"
+        />
 
       <template #account="{ item }">
         <div class="text-left">
@@ -30,7 +43,8 @@
           class="flex-shrink-0 h-4 w-4 text-gray-400 dark:text-gray-500 ms-auto"
         />
       </template>
-    </UDropdownMenu>
+      </UDropdownMenu>
+    </div>
   </header>
 </template>
 
@@ -38,6 +52,16 @@
 const supabase = useSupabaseClient();
 const user = useSupabaseUser();
 const { url: avatarUrl } = useAvatarUrl()
+
+const colorMode = useColorMode();
+const isDark = computed({
+  get() {
+    return colorMode.value === "dark";
+  },
+  set() {
+    colorMode.preference = colorMode.value === "dark" ? "light" : "dark";
+  },
+});
 
   const items = [
   [
