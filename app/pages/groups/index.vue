@@ -281,7 +281,7 @@ function groupCategoryLabel(group) {
   const c = group?.type ?? group?.category;
   if (!c) return null;
   return (
-    groupCategoryItems.find((o) => o.value === c)?.label ?? null
+    expenseGroupCategoryOptions.find((o) => o.value === c)?.label ?? null
   );
 }
 

@@ -70,13 +70,13 @@
     <section class="flex flex-wrap items-start justify-between gap-4 mb-6">
       <div class="min-w-0 flex-1 space-y-1">
         <h2 class="text-lg font-bold">Transactions</h2>
-        <p
+        <div
           v-if="!pending && filteredList.length"
           class="text-sm text-gray-600 dark:text-gray-400 flex flex-wrap"
         >
           <div class="font-medium text-gray-900 dark:text-white mr-1">{{ filterPeriodLabel }}</div> &middot;
           <div>{{ currentSummary.incomeCount }} allocated funds &middot; {{ currentSummary.expenseCount }} spends</div>
-        </p>
+        </div>
       </div>
       <div class="flex items-center gap-2">
         <TransactionModal

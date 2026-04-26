@@ -14,8 +14,12 @@
             </UFormField>
         </div>
 
-        <UButton type="submit" color="neutral" variant="solid" label="Save" :loading="uploading" :disabled="uploading"
-            @click="saveAvatar" />
+        <div class="flex gap-2">
+            <UButton type="submit" color="neutral" variant="solid" label="Save" :loading="uploading" :disabled="uploading"
+                @click="saveAvatar" />
+            <UButton v-if="user?.user_metadata?.avatar_url" color="error" variant="outline" label="Remove" :loading="uploading" :disabled="uploading"
+                @click="removeAvatar" />
+        </div>
     </div>
 </template>
 
@@ -83,6 +87,38 @@ const saveAvatar = async () => {
     } catch (error) {
         toastError({
             title: 'Error uploading avatar',
+            description: error.message
+        })
+    } finally {
+        uploading.value = false
+    }
+}
+
+const removeAvatar = async () => {
+    try {
+        uploading.value = true
+        const currentAvatarUrl = user.value.user_metadata?.avatar_url
+        
+        if (currentAvatarUrl) {
+            const { error: deleteError } = await supabase.storage.from('avatars').remove([currentAvatarUrl])
+            if (deleteError) throw deleteError
+        }
+
+        const { error: updateError } = await supabase.auth.updateUser({
+            data: {
+                avatar_url: null
+            }
+        })
+        if (updateError) throw updateError
+        
+        await supabase.auth.refreshSession()
+        
+        toastSuccess({
+            title: 'Avatar removed',
+        })
+    } catch (error) {
+        toastError({
+            title: 'Error removing avatar',
             description: error.message
         })
     } finally {

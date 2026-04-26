@@ -72,11 +72,22 @@
             :required="true"
           >
             <UInput
-              type="password"
+              :type="showPassword ? 'text' : 'password'"
               placeholder="Password"
               v-model="password"
               class="w-full"
-            />
+            >
+              <template #trailing>
+                <UButton
+                  color="neutral"
+                  variant="link"
+                  :icon="showPassword ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'"
+                  :padded="false"
+                  tabindex="-1"
+                  @click="showPassword = !showPassword"
+                />
+              </template>
+            </UInput>
           </UFormField>
           <UButton
             class="lg:w-fit justify-self-end col-span-1 lg:col-span-2"
@@ -109,6 +120,7 @@ const items = [
 const success = ref(false);
 const email = ref("");
 const password = ref("");
+const showPassword = ref(false);
 const pending = ref(false);
 const { toastError, toastSuccess } = useAppToast();
 const supabase = useSupabaseClient();

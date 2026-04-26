@@ -1,17 +1,17 @@
-export default defineNuxtRouteMiddleware((to) => {
+export default defineNuxtRouteMiddleware(async (to) => {
   const user = useSupabaseUser()
-
-  // public routes
   const publicRoutes = ['/login']
 
-  // allow public pages
   if (publicRoutes.includes(to.path)) return
 
-  // IMPORTANT: wait for auth to resolve
-  if (user.value === undefined) return
+  const supabase = useSupabaseClient()
 
-  // not logged in → redirect
   if (!user.value) {
-    return navigateTo(`/login`)
+    const { data } = await supabase.auth.getSession()
+    if (!data.session?.user) {
+      return navigateTo('/login')
+    }
+  } else if (!user.value) {
+    return navigateTo('/login')
   }
 })
