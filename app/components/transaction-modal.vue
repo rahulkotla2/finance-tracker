@@ -404,8 +404,51 @@ const save = async () => {
         p.billing_cycle_key = props.billingCycleKey;
       }
 
-      const { error } = await supabase.from("transactions").upsert(p);
-      if (error) throw error;
+      let isBatchEdit = false;
+      let batchId = null;
+      let selectedTransactions = [];
+
+      // If it's a synthetic batch transaction, its ID is a UUID from reservation_batches
+      if (props.transaction && state.value.creditLineKind === 'reserve') {
+        const { data: batches } = await supabase
+          .from('reservation_batches')
+          .select('id')
+          .eq('id', props.transaction.id);
+
+        if (batches && batches.length > 0) {
+          isBatchEdit = true;
+          batchId = batches[0].id;
+          
+          const { data: reservations } = await supabase
+            .from('transaction_reservations')
+            .select('source_transaction_id')
+            .eq('reservation_batch_id', batchId);
+            
+          selectedTransactions = reservations || [];
+        }
+      }
+
+      if (isBatchEdit) {
+        // 1. delete old batch
+        await supabase
+          .from('reservation_batches')
+          .delete()
+          .eq('id', batchId);
+
+        // 2. create new batch pointing to the same source transactions
+        const { error: rpcError } = await supabase.rpc('create_reservation_batch', {
+          p_group_id: groupIdForSave,
+          p_credit_card_id: props.creditCardId,
+          p_billing_cycle_key: billingKey,
+          p_total_amount: state.value.amount,
+          p_transaction_ids: selectedTransactions.map(t => t.source_transaction_id)
+        });
+        
+        if (rpcError) throw rpcError;
+      } else {
+        const { error } = await supabase.from("transactions").upsert(p);
+        if (error) throw error;
+      }
 
       if (!props.transaction && state.value.creditLineKind === "reserve") {
         try {

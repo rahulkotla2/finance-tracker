@@ -69,7 +69,7 @@
         </div>
         <div v-if="filteredList.length"
           class="flex items-center justify-between gap-3 border-t border-gray-200 pt-3 dark:border-gray-800 sm:flex-row sm:flex-wrap sm:items-center">
-          <div v-if="memberFilterUserId !== 'ALL'" class="max-w-md">
+          <div v-if="memberFilterUserId === user?.id" class="max-w-md">
             <USwitch v-model="spendToReserveMode" :disabled="!canAddLine" label="Spends to reserves" />
           </div>
           <div v-else></div>
@@ -84,7 +84,7 @@
         </div>
         <UButton v-if="spendToReserveMode && selectedSpendCount > 0" color="primary" variant="solid"
           :loading="bulkReserveSaving" :disabled="!canAddLine || bulkReserveSaving" class="shrink-0"
-          @click="openBulkReserveDateModal">
+          @click="openBulkReserveModal">
           {{ bulkReserveButtonLabel }}
         </UButton>
       </div>
@@ -95,10 +95,12 @@
         <DailyTransactionSummary :date="String(date)" :transactions="dayTx" credit-line-net />
         <Transaction v-for="t in dayTx" :key="t.id" :transaction="t" :group-id="groupId"
           :group-owner-user-id="ownerUserId" :member-names-by-user-id="memberNameByUserId" :show-group-badge="false"
-          show-owner-badge credit-line :credit-card-id="selectedCardId" :billing-cycle-key="selectedCycleKey"
+          :show-owner-badge="memberFilterUserId === 'ALL'" credit-line :credit-card-id="selectedCardId" :billing-cycle-key="selectedCycleKey"
           :card-billing-cycle-start-day="selectedCard?.billing_cycle_start_day"
           :card-billing-cycle-end-day="selectedCard?.billing_cycle_end_day"
           :pick-spend-for-reserve-mode="spendToReserveMode" :credit-spend-selected="isSpendSelected(t)"
+          :is-fully-reserved="(reservedAmountByTxId[t.id] || 0) >= (Number(t.amount) || 0)"
+          :reserved-amount="reservedAmountByTxId[t.id] || 0"
           @toggle-credit-spend-select="(on) => setSpendSelected(t.id, on)" @deleted="refreshData"
           @edited="refreshData" />
       </div>
@@ -111,23 +113,21 @@
       <USkeleton v-for="i in 3" :key="i" class="h-12 w-full" />
     </div>
 
-    <UModal v-model:open="bulkReserveDateModalOpen" title="Date for combined savings" class="sm:max-w-md">
+    <UModal v-model:open="bulkReserveDateModalOpen" title="Save money for selected lines" class="sm:max-w-md">
       <template #body>
         <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          One reserve line will be added for
-          <span class="font-medium tabular-nums">{{ bulkReservePreviewAmountLabel }}</span>
-          ({{ selectedSpendCount }} selected line{{ selectedSpendCount === 1 ? "" : "s" }}). Pick the
-          date for that reserve; it must fall in this statement period.
+          Reserve an amount for the {{ selectedSpendCount }} selected line{{ selectedSpendCount === 1 ? "" : "s" }}.
+          The available unreserved amount is
+          <span class="font-medium tabular-nums">{{ new Intl.NumberFormat('en-US', { style: 'currency', currency: 'INR' }).format(bulkReserveDefaultAmount) }}</span>.
         </p>
-        <UFormField label="Transaction date" required class="mb-4">
-          <UInput v-model="bulkReserveDateIso" type="date" class="w-full max-w-xs"
-            icon="i-heroicons-calendar-days-20-solid" />
+        <UFormField label="Reserve Amount" required class="mb-4">
+          <UInput v-model="bulkReserveAmount" type="number" step="0.01" class="w-full max-w-xs" />
         </UFormField>
         <div class="flex flex-wrap justify-end gap-2">
           <UButton color="neutral" variant="outline" label="Cancel" :disabled="bulkReserveSaving"
             @click="bulkReserveDateModalOpen = false" />
           <UButton color="primary" variant="solid" label="Add reserve" :loading="bulkReserveSaving"
-            :disabled="bulkReserveSaving || !bulkReserveDateIso" @click="confirmBulkReserveWithDate" />
+            :disabled="bulkReserveSaving || !bulkReserveAmount || bulkReserveAmount <= 0" @click="confirmBulkReserve" />
         </div>
       </template>
     </UModal>
@@ -189,8 +189,7 @@ const spendToReserveMode = ref(false);
 const selectedSpendIds = ref([]);
 const bulkReserveSaving = ref(false);
 const bulkReserveDateModalOpen = ref(false);
-/** `YYYY-MM-DD` for the new reserve row (user-chosen). */
-const bulkReserveDateIso = ref("");
+const bulkReserveAmount = ref(0);
 const memberFilterUserId = ref("ALL");
 const selectedCardId = ref(null);
 const selectedCycleKey = ref("");
@@ -445,10 +444,66 @@ const { data: currentList, pending: pCur, refresh: rCur } = await useAsyncData(
   { watch: [currentTxKey] },
 );
 
+const { data: reservationsList, refresh: rRes } = await useAsyncData(
+  () => `cc-res:${currentTxKey.value}`,
+  async () => {
+    if (!import.meta.client) return [];
+    if (!props.groupId || !selectedCardId.value || !selectedCycleKey.value) {
+      return [];
+    }
+    const { data, error } = await supabase
+      .from('transaction_reservations')
+      .select('*')
+      .eq('group_id', props.groupId)
+      .eq('credit_card_id', selectedCardId.value)
+      .eq('billing_cycle_key', selectedCycleKey.value);
+    
+    if (error) {
+      console.error(error);
+      return [];
+    }
+    return data ?? [];
+  },
+  { watch: [currentTxKey] }
+);
+
+const { data: batchesList, refresh: rBatches } = await useAsyncData(
+  () => `cc-batches:${currentTxKey.value}`,
+  async () => {
+    if (!import.meta.client) return [];
+    if (!props.groupId || !selectedCardId.value || !selectedCycleKey.value) {
+      return [];
+    }
+    const { data, error } = await supabase
+      .from('reservation_batches')
+      .select('*')
+      .eq('group_id', props.groupId)
+      .eq('credit_card_id', selectedCardId.value)
+      .eq('billing_cycle_key', selectedCycleKey.value);
+    
+    if (error) {
+      console.error(error);
+      return [];
+    }
+    return data ?? [];
+  },
+  { watch: [currentTxKey] }
+);
+
+const reservedAmountByTxId = computed(() => {
+  const map = {};
+  for (const r of reservationsList.value ?? []) {
+    map[r.source_transaction_id] = (map[r.source_transaction_id] || 0) + Number(r.reserved_amount);
+  }
+  return map;
+});
+
 const txLoading = computed(() => pCur.value);
 
 const refreshData = () => {
   rCur();
+  rRes();
+  rBatches();
   refreshCards();
   refreshCycles();
 };
@@ -474,7 +529,7 @@ function userSum(list, kind, userId) {
   const oId = ownerUserId.value;
   const kindPred =
     kind === "spend"
-      ? (t) => isCcSpend(t) || t.type === "Expense"
+      ? (t) => isCcSpend(t) || (t.type === "Expense" && t.subtype !== "reserve" && t.subtype !== "payment")
       : kind === "reserve"
         ? isCcReserve
         : isCcPaymentToOwner;
@@ -498,9 +553,36 @@ const nonOwnerIds = computed(() =>
     .map((m) => m.user_id),
 );
 
+const reserveTransactions = computed(() => {
+  return (batchesList.value ?? []).map(b => {
+    const userId = b.reserved_by || b.user_id || b.created_by;
+    const member = (props.members ?? []).find(m => m.user_id === userId);
+    return {
+      id: b.id,
+      type: "Expense",
+      subtype: "reserve",
+      amount: Number(b.total_amount || b.amount || 0),
+      created_at: b.created_at,
+      description: b.description || "Reserve batch",
+      user_id: userId,
+      group_id: b.group_id,
+      credit_card_id: b.credit_card_id,
+      billing_cycle_key: b.billing_cycle_key,
+      profiles: member?.profiles || null,
+    };
+  });
+});
+
+const combinedList = computed(() => {
+  const normalTx = (currentList.value ?? []).filter(t => t.subtype !== "reserve");
+  const all = [...normalTx, ...reserveTransactions.value];
+  all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  return all;
+});
+
 const currentFilteredByDate = computed(() => {
-  if (selectedDateId.value === "ALL") return currentList.value ?? [];
-  return (currentList.value ?? []).filter((t) => t.created_at?.startsWith(selectedDateId.value));
+  if (selectedDateId.value === "ALL") return combinedList.value;
+  return combinedList.value.filter((t) => t.created_at?.startsWith(selectedDateId.value));
 });
 
 const settlementRows = computed(() => {
@@ -531,7 +613,7 @@ const byUserSpent = computed(() => {
     if (m?.user_id) map[m.user_id] = 0;
   });
   for (const t of currentFilteredByDate.value) {
-    if ((isCcSpend(t) || t.type === "Expense") && t.user_id) {
+    if ((isCcSpend(t) || (t.type === "Expense" && t.subtype !== "reserve" && t.subtype !== "payment")) && t.user_id) {
       map[t.user_id] = (map[t.user_id] ?? 0) + (t.amount || 0);
     }
   }
@@ -583,7 +665,7 @@ const allMembersView = computed(() => {
   const oId = ownerUserId.value;
   const sumE = (L) =>
     r2(
-      (L ?? []).filter((t) => isCcSpend(t) || t.type === "Expense")
+      (L ?? []).filter((t) => isCcSpend(t) || (t.type === "Expense" && t.subtype !== "reserve" && t.subtype !== "payment"))
         .reduce((a, t) => a + t.amount, 0),
     );
   const totalNetSaved = (L) => {
@@ -673,7 +755,12 @@ const filterPeriodLabel = computed(() => {
 function isCcCardSpendOnly(t) {
   if (!t?.id) return false;
   if (isCcReserve(t) || isCcPaymentToOwner(t)) return false;
-  return isCcSpend(t);
+  if (!isCcSpend(t)) return false;
+  
+  const reserved = reservedAmountByTxId.value[t.id] || 0;
+  if (reserved >= (Number(t.amount) || 0)) return false;
+  
+  return true;
 }
 
 const selectedReserveSourceRows = computed(() => {
@@ -683,17 +770,12 @@ const selectedReserveSourceRows = computed(() => {
   );
 });
 
-const bulkReservePreviewAmountLabel = computed(() => {
-  const sum = r2(
-    selectedReserveSourceRows.value.reduce(
-      (a, t) => a + (Number(t.amount) || 0),
-      0,
-    ),
-  );
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "INR",
-  }).format(sum);
+const bulkReserveDefaultAmount = computed(() => {
+  return r2(selectedReserveSourceRows.value.reduce((a, t) => {
+    const reserved = reservedAmountByTxId.value[t.id] || 0;
+    const available = Math.max(0, (Number(t.amount) || 0) - reserved);
+    return a + available;
+  }, 0));
 });
 
 function isSpendSelected(t) {
@@ -719,7 +801,7 @@ const bulkReserveButtonLabel = computed(() => {
   return `Save money for these ${n} transactions`;
 });
 
-function openBulkReserveDateModal() {
+function openBulkReserveModal() {
   const rows = selectedReserveSourceRows.value;
   selectedSpendIds.value = rows.map((t) => String(t.id));
   if (!rows.length) {
@@ -729,25 +811,17 @@ function openBulkReserveDateModal() {
     });
     return;
   }
-  const latest = rows.reduce(
-    (best, t) => {
-      const ts = new Date(t.created_at).getTime();
-      return ts > best.ts ? { ts, row: t } : best;
-    },
-    { ts: -Infinity, row: rows[0] },
-  );
-  bulkReserveDateIso.value = String(latest.row.created_at).split("T")[0];
+  bulkReserveAmount.value = bulkReserveDefaultAmount.value;
   bulkReserveDateModalOpen.value = true;
 }
 
-async function confirmBulkReserveWithDate() {
-  if (!bulkReserveDateIso.value) {
-    toastError({
-      title: "Date required",
-      description: "Choose a transaction date for the new reserve line.",
-    });
+async function confirmBulkReserve() {
+  const amount = Number(bulkReserveAmount.value) || 0;
+  if (amount <= 0) {
+    toastError({ title: "Invalid amount", description: "Amount must be greater than zero." });
     return;
   }
+
   if (!props.groupId || !selectedCardId.value || !selectedCycleKey.value) {
     toastError({
       title: "Missing context",
@@ -784,69 +858,25 @@ async function confirmBulkReserveWithDate() {
     });
     return;
   }
-  const userIdForReserve = uids[0];
-  const card = selectedCard.value;
-  const s = card?.billing_cycle_start_day;
-  const e = card?.billing_cycle_end_day;
-  const hasCardCycle =
-    s != null &&
-    s !== "" &&
-    e != null &&
-    e !== "";
-  if (!hasCardCycle) {
-    toastError({
-      title: "Card billing days missing",
-      description: "This card needs cycle start and end days to validate the date.",
-    });
-    return;
-  }
-  const txDate = localDateFromInput(bulkReserveDateIso.value);
-  const keyForDate = getBillingCycleKeyForTransactionDate(
-    txDate,
-    Number(s),
-    Number(e),
-  );
-  if (keyForDate !== selectedCycleKey.value) {
-    toastError({
-      title: "Date not in this statement",
-      description:
-        "Choose a date that falls in the statement period you have open, or switch statement to match the date.",
-    });
-    return;
-  }
+
   bulkReserveSaving.value = true;
   try {
-    const sum = r2(rows.reduce((a, t) => a + (Number(t.amount) || 0), 0));
-    if (sum <= 0) {
-      toastError({
-        title: "Invalid total",
-        description: "Selected amounts must sum to more than zero.",
-      });
-      return;
+    const { data, error } = await supabase.rpc('create_reservation_batch', {
+      p_group_id: props.groupId,
+      p_credit_card_id: selectedCardId.value,
+      p_billing_cycle_key: selectedCycleKey.value,
+      p_total_amount: amount,
+      p_transaction_ids: rows.map(t => t.id)
+    });
+
+    if (error) {
+      console.error(error);
+      throw error;
     }
-    const day = String(bulkReserveDateIso.value).split("T")[0];
-    const created = `${day}T12:00:00.000Z`;
-    const payload = {
-      ...buildCreditLinePayload({
-        creditLineKind: "reserve",
-        amount: sum,
-        created_at: created,
-        description: `Reserve from ${rows.length} selected line${rows.length === 1 ? "" : "s"}`,
-        group_id: props.groupId,
-      }),
-      credit_card_id: selectedCardId.value,
-      billing_cycle_key: selectedCycleKey.value,
-    };
-    const { error } = await supabase.from("transactions").insert(payload);
-    if (error) throw error;
-    try {
-      await mirrorReserveToMonthlyExpense(supabase, sum, created, payload.description);
-    } catch (mirrorError) {
-      console.error("Failed to mirror reserve:", mirrorError);
-    }
+
     toastSuccess({
       title: "Savings recorded",
-      description: `Added one reserve line for ${sum} (${rows.length} line${rows.length === 1 ? "" : "s"}).`,
+      description: `Reserved ${amount} across ${rows.length} line${rows.length === 1 ? "" : "s"}.`,
     });
     selectedSpendIds.value = [];
     spendToReserveMode.value = false;

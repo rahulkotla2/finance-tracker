@@ -52,8 +52,13 @@
       </div>
     </div>
     <div class="flex items-center justify-between gap-3 sm:justify-end sm:gap-2">
-      <div class="text-base font-medium tabular-nums sm:font-normal">
-        {{ currency }}
+      <div class="flex flex-col items-end">
+        <div class="text-base font-medium tabular-nums sm:font-normal">
+          {{ currency }}
+        </div>
+        <div v-if="reservedAmount > 0 && (transaction.amount - reservedAmount) > 0" class="text-xs text-amber-600 dark:text-amber-400 font-medium mt-0.5">
+          Remaining: {{ remainingCurrency }}
+        </div>
       </div>
       <div class="shrink-0" v-if="!isDemo">
         <UDropdownMenu :items="items" :popper="{ placement: 'bottom-end' }">
@@ -131,11 +136,20 @@ const props = defineProps({
   /** Credit card view: when true, show a checkbox on plain card spend rows only. */
   pickSpendForReserveMode: { type: Boolean, default: false },
   creditSpendSelected: { type: Boolean, default: false },
+  isFullyReserved: { type: Boolean, default: false },
+  reservedAmount: { type: Number, default: 0 },
 });
 
 const emit = defineEmits(["deleted", "edited", "toggleCreditSpendSelect"]);
 const isOpen = ref(false);
 const { currency } = useCurrency(props.transaction.amount);
+const remainingCurrency = computed(() => {
+  const rem = Math.max(0, props.transaction.amount - props.reservedAmount);
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'INR'
+  }).format(rem);
+});
 const supabase = useSupabaseClient();
 
 const isIncome = computed(
@@ -150,6 +164,7 @@ const showReserveOrPayment = computed(
 /** Card spend only — not reserve, not payment-to-owner; any member’s line in this list. */
 const showSpendPickCheckbox = computed(() => {
   if (!props.pickSpendForReserveMode || !props.creditLine) return false;
+  if (props.isFullyReserved) return false;
   const t = props.transaction;
   if (isCcReserve(t) || isCcPaymentToOwner(t)) return false;
   return isCcSpend(t);
@@ -213,6 +228,9 @@ const { toastSuccess, toastError } = useAppToast();
 const deleteTransaction = async () => {
   isLoading.value = true;
   try {
+    if (ccReserve.value) {
+      await supabase.from("reservation_batches").delete().eq("id", props.transaction.id);
+    }
     await supabase.from("transactions").delete().eq("id", props.transaction.id);
     toastSuccess({ title: "Transaction deleted" });
     emit("deleted", props.transaction.id);
@@ -223,20 +241,30 @@ const deleteTransaction = async () => {
   }
 };
 
-const items = [
+const items = computed(() => [
   [
     {
       label: "Edit",
       icon: "i-heroicons-pencil-square-20-solid",
       onSelect: () => {
+        if (props.reservedAmount > 0) {
+          toastError({ title: "Action not allowed", description: "Cannot edit a transaction that has active reservations." });
+          return;
+        }
         isOpen.value = true;
       },
     },
     {
       label: "Delete",
       icon: "i-heroicons-trash-20-solid",
-      onSelect: deleteTransaction,
+      onSelect: () => {
+        if (props.reservedAmount > 0) {
+          toastError({ title: "Action not allowed", description: "Cannot delete a transaction that has active reservations." });
+          return;
+        }
+        deleteTransaction();
+      },
     },
   ],
-];
+]);
 </script>
