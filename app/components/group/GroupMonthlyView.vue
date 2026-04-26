@@ -3,21 +3,10 @@
     <div class="flex flex-col gap-3 mt-5">
       <div class="flex flex-wrap items-center gap-3">
         <h1 class="text-3xl font-extrabold">{{ groupTitle || "Monthly group" }}</h1>
-        <div
-          v-if="owner"
-          class="h-fit inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm"
-        >
-          <UAvatar
-            v-if="avatarSrc(owner)"
-            :src="avatarSrc(owner)"
-            size="xs"
-          />
-          <span class="font-medium">{{ memberDisplayName(owner) }}</span>
-        </div>
       </div>
-      <div class="flex flex-wrap items-end justify-between gap-3 mt-2">
-        <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
-          <UFormField name="memberFilter" label="Member" class="min-w-48">
+      <div class="flex items-center justify-between gap-3 mt-2">
+        <div class="flex items-center gap-3">
+          <UFormField name="memberFilter">
             <USelectMenu
               v-model="memberFilterUserId"
               value-key="id"
@@ -37,20 +26,15 @@
               </template>
             </USelectMenu>
           </UFormField>
-          <UFormField
-            v-if="cycleMenuItems.length"
-            name="cycle"
-            :label="hasConfiguredCycle ? 'Expense period' : 'Month (calendar)'"
-            class="min-w-64"
-          >
-            <USelectMenu
-              v-model="selectedPeriodId"
-              value-key="id"
-              :items="cycleMenuItems"
-              class="w-full min-w-64"
-            />
-          </UFormField>
         </div>
+        <UButton
+          icon="i-heroicons-funnel"
+          color="neutral"
+          variant="outline"
+          aria-label="Filter"
+          class="shrink-0 rounded-full"
+          @click="isFilterModalOpen = true"
+        />
       </div>
     </div>
 
@@ -62,7 +46,7 @@
       valid (1–31).
     </p>
 
-    <section class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 sm:gap-6 lg:gap-10">
+    <section class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3 sm:gap-6 lg:gap-10">
       <Trend
         color="green"
         title="Allocated Funds"
@@ -85,19 +69,13 @@
 
     <section class="flex flex-wrap items-start justify-between gap-4 mb-6">
       <div class="min-w-0 flex-1 space-y-1">
-        <h2 class="text-lg font-bold">Activity</h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400">
-          <template v-if="filterNote">{{ filterNote }}</template>
-          <template v-else-if="selectedCycleLabel">
-            All activity in <span class="font-medium text-gray-700 dark:text-gray-300">{{ selectedCycleLabel }}</span>.
-          </template>
-          <template v-else>Transactions in the selected period.</template>
-        </p>
+        <h2 class="text-lg font-bold">Transactions</h2>
         <p
           v-if="!pending && filteredList.length"
-          class="text-sm text-gray-600 dark:text-gray-400"
+          class="text-sm text-gray-600 dark:text-gray-400 flex flex-wrap"
         >
-          {{ currentSummary.incomeCount }} allocated funds · {{ currentSummary.expenseCount }} spends
+          <div class="font-medium text-gray-900 dark:text-white mr-1">{{ filterPeriodLabel }}</div> &middot;
+          <div>{{ currentSummary.incomeCount }} allocated funds &middot; {{ currentSummary.expenseCount }} spends</div>
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -142,11 +120,45 @@
     <div v-else>
       <USkeleton v-for="i in 4" :key="i" class="h-12 w-full mb-2" />
     </div>
+
+    <UModal v-model:open="isFilterModalOpen" title="Select expense period">
+      <template #body>
+        <UFormField
+          v-if="cycleMenuItems.length"
+          name="cycle"
+          :label="hasConfiguredCycle ? 'Expense period' : 'Month (calendar)'"
+        >
+          <USelectMenu
+            v-model="tempSelectedPeriodId"
+            value-key="id"
+            :items="cycleMenuItems"
+            class="w-full"
+          />
+        </UFormField>
+        <UFormField
+          name="dateFilter"
+          label="Specific date"
+          class="mt-4"
+        >
+          <USelectMenu
+            v-model="tempSelectedDateId"
+            value-key="id"
+            :items="[{ id: 'ALL', label: 'All days in period' }, ...tempPeriodDates]"
+            placeholder="All days in period"
+            class="w-full"
+          />
+        </UFormField>
+        <div class="flex justify-end gap-3 mt-6">
+          <UButton color="neutral" variant="outline" label="Cancel" @click="isFilterModalOpen = false" />
+          <UButton color="neutral" variant="solid" label="OK" @click="applyFilter" />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
 
 <script setup>
-import { format, subMonths, endOfMonth, startOfMonth } from "date-fns";
+import { format, subMonths, endOfMonth, startOfMonth, eachDayOfInterval } from "date-fns";
 import {
   listCardStatementCycleMenuItems,
 } from "~/utils/billingCycle";
@@ -172,6 +184,41 @@ const supabase = useSupabaseClient();
 const isAddOpen = ref(false);
 const memberFilterUserId = ref("ALL");
 const selectedPeriodId = ref("");
+const selectedDateId = ref("ALL");
+const isFilterModalOpen = ref(false);
+const tempSelectedPeriodId = ref("");
+const tempSelectedDateId = ref("ALL");
+
+const tempPeriodDates = computed(() => {
+  const row = cycleMenuItems.value.find((c) => c.id === tempSelectedPeriodId.value);
+  if (!row?.start || !row?.end) return [];
+  try {
+    const days = eachDayOfInterval({ start: row.start, end: row.end });
+    return days.map((d) => {
+      const val = format(d, "yyyy-MM-dd");
+      return { id: val, label: format(d, "MMM d, yyyy") };
+    });
+  } catch (e) {
+    return [];
+  }
+});
+
+watch(tempSelectedPeriodId, () => {
+  tempSelectedDateId.value = "ALL";
+});
+
+watch(isFilterModalOpen, (open) => {
+  if (open) {
+    tempSelectedPeriodId.value = selectedPeriodId.value;
+    tempSelectedDateId.value = selectedDateId.value;
+  }
+});
+
+const applyFilter = () => {
+  selectedPeriodId.value = tempSelectedPeriodId.value;
+  selectedDateId.value = tempSelectedDateId.value;
+  isFilterModalOpen.value = false;
+};
 
 const memberDisplayName = (m) => {
   const n = m?.profiles?.full_name;
@@ -310,6 +357,13 @@ const selectedCycleRow = computed(
 
 const selectedCycleLabel = computed(() => selectedCycleRow.value?.label ?? "");
 
+const filterPeriodLabel = computed(() => {
+  if (selectedDateId.value !== "ALL") {
+    return format(new Date(selectedDateId.value + 'T12:00:00'), "MMM d, yyyy");
+  }
+  return selectedCycleLabel.value;
+});
+
 const currentPeriod = computed(() => {
   const c = selectedCycleRow.value;
   if (!c?.start || !c?.end) return { from: new Date(0), to: new Date(0) };
@@ -336,9 +390,13 @@ const refreshData = () => {
   refreshCycles();
 };
 
-const currentFiltered = computed(() =>
-  filterTransactionsByUserId(currentAll.value, memberFilterUserId.value),
-);
+const currentFiltered = computed(() => {
+  let list = filterTransactionsByUserId(currentAll.value, memberFilterUserId.value);
+  if (selectedDateId.value !== "ALL") {
+    list = list.filter((t) => t.created_at?.startsWith(selectedDateId.value));
+  }
+  return list;
+});
 
 
 const currentSummary = computed(() =>
@@ -354,7 +412,7 @@ const filterNote = computed(() => {
   const m = memberFilterItems.value.find(
     (x) => x.id === memberFilterUserId.value,
   );
-  const label = selectedCycleLabel.value || "this period";
+  const label = filterPeriodLabel.value || "this period";
   return `Showing ${m?.label ?? "this member"} in ${label}.`;
 });
 </script>

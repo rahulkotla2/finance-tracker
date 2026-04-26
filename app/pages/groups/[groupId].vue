@@ -1,11 +1,6 @@
 <template>
   <div class="mb-2">
-    <NuxtLink
-      to="/groups"
-      class="text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-    >
-      ← Groups
-    </NuxtLink>
+    <UButton to="/groups" icon="i-heroicons-arrow-left" color="neutral" variant="outline" aria-label="Back to Groups" />
   </div>
 
   <div v-if="accessPending" class="space-y-6">

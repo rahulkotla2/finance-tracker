@@ -5,266 +5,110 @@
         <h1 class="text-3xl font-extrabold">
           {{ groupTitle || "Credit card" }}
         </h1>
-        <div
-          v-if="owner"
-          class="h-fit inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm"
-        >
-          <UAvatar
-            v-if="avatarSrc(owner)"
-            :src="avatarSrc(owner)"
-            size="xs"
-          />
-          <span class="font-medium">{{ memberDisplayName(owner) }}</span>
-        </div>
       </div>
-      <div class="flex flex-wrap items-end justify-between gap-4 mt-2">
-        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-4">
-          <UFormField name="memberFilter" label="Member" class="min-w-48">
-            <USelectMenu
-              v-model="memberFilterUserId"
-              value-key="id"
-              :items="memberFilterItems"
-              placeholder="All members"
-              class="w-56"
-            >
+      <div class="flex items-center justify-between gap-3 mt-2">
+        <div class="flex items-center gap-3">
+          <UFormField name="memberFilter">
+            <USelectMenu v-model="memberFilterUserId" value-key="id" :items="memberFilterItems"
+              placeholder="All members" class="w-56">
               <template #item-trailing="{ item }">
-                <UBadge
-                  v-if="isMemberItemCardOwner(item)"
-                  color="primary"
-                  variant="subtle"
-                  class="shrink-0 text-[11px] font-medium"
-                >
+                <UBadge v-if="isMemberItemCardOwner(item)" color="primary" variant="subtle"
+                  class="shrink-0 text-[11px] font-medium">
                   Card owner
                 </UBadge>
               </template>
             </USelectMenu>
           </UFormField>
-          <UFormField v-if="cardMenuItems.length" name="cardFilter" label="Card">
-            <USelectMenu
-              v-model="selectedCardId"
-              value-key="id"
-              :items="cardMenuItems"
-              placeholder="Select card"
-              class="w-48"
-            />
-          </UFormField>
         </div>
-        <UFormField
-          v-if="selectedCardId"
-          name="statementCycle"
-          label="Statement"
-          class="min-w-64"
-        >
-          <USelectMenu
-            v-model="selectedCycleKey"
-            value-key="id"
-            :items="cycleMenuItems"
-            class="w-full min-w-64"
-          />
-        </UFormField>
+        <UButton icon="i-heroicons-funnel" color="neutral" variant="outline" aria-label="Filter"
+          class="shrink-0 rounded-full" @click="isFilterModalOpen = true" />
       </div>
     </div>
 
-    <p
-      v-if="!cardMenuItems.length && !cardsPending"
-      class="text-sm text-amber-700 dark:text-amber-300"
-    >
+    <p v-if="!cardMenuItems.length && !cardsPending" class="text-sm text-amber-700 dark:text-amber-300">
       No active credit cards. Add one under
       <NuxtLink to="/cards" class="font-medium underline">Credit cards</NuxtLink> first.
     </p>
 
-    <section
-      v-if="memberFilterUserId === 'ALL' && hasCard"
-      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 sm:gap-6 lg:gap-10"
-    >
-      <Trend
-        color="red"
-        title="Total Spends"
-        :amount="allMembersView.spent"
-        :loading="txLoading"
-      />
-      <Trend
-        :color="allMembersView.saved < 0 ? 'text-amber-600 dark:text-amber-400' : 'green'"
-        title="Total Saved"
-        :amount="allMembersView.saved"
-        :loading="txLoading"
-      />
-      <Trend
-        color="green"
-        title="Available to Repay"
-        :amount="allMembersView.availableToPayCard"
-        :loading="txLoading"
-      />
-      <Trend
-        color="red"
-        title="Debt (spent - saved)"
-        :amount="allMembersView.debtDepth"
-        :loading="txLoading"
-      />
+    <section v-if="memberFilterUserId === 'ALL' && hasCard"
+      class="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-6 lg:gap-10">
+      <Trend color="red" title="Total Spends" :amount="allMembersView.spent" :loading="txLoading" />
+      <Trend :color="allMembersView.saved < 0 ? 'text-amber-600 dark:text-amber-400' : 'green'" title="Total Saved"
+        :amount="allMembersView.saved" :loading="txLoading" />
+      <Trend color="green" title="Available to Repay" :amount="allMembersView.availableToPayCard"
+        :loading="txLoading" />
+      <Trend color="red" title="Debt (spent - saved)" :amount="allMembersView.debtDepth" :loading="txLoading" />
     </section>
 
-    <section
-      v-else-if="memberFilterUserId === ownerUserId && ownerUserId && hasCard"
-      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 sm:gap-10 lg:gap-14"
-    >
-      <Trend
-        color="red"
-        title="Your Spends"
-        :amount="ownerAsMemberView.mySpent"
-        :loading="txLoading"
-      />
-      <Trend
-        :color="ownerAsMemberView.mySaved < 0 ? 'text-amber-600 dark:text-amber-400' : 'green'"
-        title="Your Savings"
-        :amount="ownerAsMemberView.mySaved"
-        :loading="txLoading"
-      />
-      <Trend
-        color="text-amber-600 dark:text-amber-400"
-        title="Due from Others"
-        :amount="ownerAsMemberView.shouldGetFromOthers"
-        :loading="txLoading"
-      />
-      <Trend
-        color="green"
-        title="Received from Others"
-        :amount="ownerAsMemberView.gotFromOthers"
-        :loading="txLoading"
-      />
+    <section v-else-if="memberFilterUserId === ownerUserId && ownerUserId && hasCard"
+      class="grid grid-cols-2 sm:grid-cols-2 gap-4 lg:grid-cols-4 sm:gap-10 lg:gap-14">
+      <Trend color="red" title="Your Spends" :amount="ownerAsMemberView.mySpent" :loading="txLoading" />
+      <Trend :color="ownerAsMemberView.mySaved < 0 ? 'text-amber-600 dark:text-amber-400' : 'green'"
+        title="Your Savings" :amount="ownerAsMemberView.mySaved" :loading="txLoading" />
+      <Trend color="text-amber-600 dark:text-amber-400" title="Amount Receivable"
+        :amount="ownerAsMemberView.shouldGetFromOthers" :loading="txLoading" />
+      <Trend color="green" title="Amount Received" :amount="ownerAsMemberView.gotFromOthers" :loading="txLoading" />
     </section>
 
-    <section
-      v-else-if="hasCard && memberFilterUserId && memberFilterUserId !== 'ALL'"
-      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 sm:gap-10 lg:gap-14"
-    >
-      <Trend
-        color="red"
-        title="Expenses"
-        :amount="nonOwnerView.spent"
-        :loading="txLoading"
-      />
-      <Trend
-        :color="nonOwnerView.saved < 0 ? 'text-amber-600 dark:text-amber-400' : 'green'"
-        title="Savings"
-        :amount="nonOwnerView.saved"
-        :loading="txLoading"
-      />
-      <Trend
-        color="green"
-        title="Paid"
-        :amount="nonOwnerView.paidToOwner"
-        :loading="txLoading"
-      />
-      <Trend
-        color="red"
-        title="Owed"
-        :amount="nonOwnerView.stillOwesOwner"
-        :loading="txLoading"
-      />
+    <section v-else-if="hasCard && memberFilterUserId && memberFilterUserId !== 'ALL'"
+      class="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-10 lg:gap-14">
+      <Trend color="red" title="Expenses" :amount="nonOwnerView.spent" :loading="txLoading" />
+      <Trend :color="nonOwnerView.saved < 0 ? 'text-amber-600 dark:text-amber-400' : 'green'" title="Savings"
+        :amount="nonOwnerView.saved" :loading="txLoading" />
+      <Trend color="green" title="Paid" :amount="nonOwnerView.paidToOwner" :loading="txLoading" />
+      <Trend color="red" title="Owed" :amount="nonOwnerView.stillOwesOwner" :loading="txLoading" />
     </section>
 
-    <section
-      v-if="hasCard"
-      class="flex flex-wrap items-start justify-between gap-4 mb-6"
-    >
+    <section v-if="hasCard" class="flex flex-wrap items-start justify-between gap-4 mb-6">
       <div class="min-w-0 flex-1 space-y-3">
         <div>
           <h2 class="text-lg font-bold">Activity</h2>
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            <template v-if="filterNote">{{ filterNote }}</template>
-            <template v-else>Charges for this card in this period.</template>
+            <span class="font-medium text-gray-900 dark:text-white mr-1">{{ filterPeriodLabel }}</span>
           </p>
         </div>
-        <div
-          v-if="filteredList.length"
-          class="flex flex-col gap-3 border-t border-gray-200 pt-3 dark:border-gray-800 sm:flex-row sm:flex-wrap sm:items-center"
-        >
-          <USwitch
-            v-model="spendToReserveMode"
-            :disabled="!canAddLine"
-            label="Spends to reserves"
-            class="max-w-md"
-          />
-          <UButton
-            v-if="spendToReserveMode && selectedSpendCount > 0"
-            color="primary"
-            variant="solid"
-            :loading="bulkReserveSaving"
-            :disabled="!canAddLine || bulkReserveSaving"
-            class="shrink-0"
-            @click="openBulkReserveDateModal"
-          >
-            {{ bulkReserveButtonLabel }}
-          </UButton>
+        <div v-if="filteredList.length"
+          class="flex items-center justify-between gap-3 border-t border-gray-200 pt-3 dark:border-gray-800 sm:flex-row sm:flex-wrap sm:items-center">
+          <USwitch v-model="spendToReserveMode" :disabled="!canAddLine" label="Spends to reserves" class="max-w-md" />
+          <div class="flex items-center gap-2">
+            <TransactionModal v-model:isOpen="isAddOpen" :group-id="groupId" :group-owner-user-id="ownerUserId"
+              :credit-card-id="selectedCardId" :billing-cycle-key="selectedCycleKey"
+              :card-billing-cycle-start-day="selectedCard?.billing_cycle_start_day"
+              :card-billing-cycle-end-day="selectedCard?.billing_cycle_end_day" credit-card @saved="refreshData" />
+            <UButton color="neutral" icon="i-heroicons-plus-circle-solid" variant="outline" label="Add"
+              :disabled="!canAddLine" @click="isAddOpen = true" />
+          </div>
         </div>
-      </div>
-      <div class="flex items-center gap-2">
-        <TransactionModal
-          v-model:isOpen="isAddOpen"
-          :group-id="groupId"
-          :group-owner-user-id="ownerUserId"
-          :credit-card-id="selectedCardId"
-          :billing-cycle-key="selectedCycleKey"
-          :card-billing-cycle-start-day="selectedCard?.billing_cycle_start_day"
-          :card-billing-cycle-end-day="selectedCard?.billing_cycle_end_day"
-          credit-card
-          @saved="refreshData"
-        />
-        <UButton
-          color="neutral"
-          icon="i-heroicons-plus-circle-solid"
-          variant="outline"
-          label="Add"
-          :disabled="!canAddLine"
-          @click="isAddOpen = true"
-        />
+        <UButton v-if="spendToReserveMode && selectedSpendCount > 0" color="primary" variant="solid"
+          :loading="bulkReserveSaving" :disabled="!canAddLine || bulkReserveSaving" class="shrink-0"
+          @click="openBulkReserveDateModal">
+          {{ bulkReserveButtonLabel }}
+        </UButton>
       </div>
     </section>
 
     <section v-if="hasCard && filteredList.length" class="space-y-0">
       <div v-for="(dayTx, date) in byDate" :key="String(date)">
-        <DailyTransactionSummary
-          :date="String(date)"
-          :transactions="dayTx"
-          credit-line-net
-        />
-        <Transaction
-          v-for="t in dayTx"
-          :key="t.id"
-          :transaction="t"
-          :group-id="groupId"
-          :group-owner-user-id="ownerUserId"
-          :member-names-by-user-id="memberNameByUserId"
-          :show-group-badge="false"
-          show-owner-badge
-          credit-line
-          :credit-card-id="selectedCardId"
-          :billing-cycle-key="selectedCycleKey"
+        <DailyTransactionSummary :date="String(date)" :transactions="dayTx" credit-line-net />
+        <Transaction v-for="t in dayTx" :key="t.id" :transaction="t" :group-id="groupId"
+          :group-owner-user-id="ownerUserId" :member-names-by-user-id="memberNameByUserId" :show-group-badge="false"
+          show-owner-badge credit-line :credit-card-id="selectedCardId" :billing-cycle-key="selectedCycleKey"
           :card-billing-cycle-start-day="selectedCard?.billing_cycle_start_day"
           :card-billing-cycle-end-day="selectedCard?.billing_cycle_end_day"
-          :pick-spend-for-reserve-mode="spendToReserveMode"
-          :credit-spend-selected="isSpendSelected(t)"
-          @toggle-credit-spend-select="(on) => setSpendSelected(t.id, on)"
-          @deleted="refreshData"
-          @edited="refreshData"
-        />
+          :pick-spend-for-reserve-mode="spendToReserveMode" :credit-spend-selected="isSpendSelected(t)"
+          @toggle-credit-spend-select="(on) => setSpendSelected(t.id, on)" @deleted="refreshData"
+          @edited="refreshData" />
       </div>
     </section>
-    <p
-      v-else-if="hasCard && !txLoading"
-      class="text-sm text-gray-500 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6"
-    >
+    <p v-else-if="hasCard && !txLoading"
+      class="text-sm text-gray-500 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6">
       No lines in this statement. Pick another period or add a line.
     </p>
     <div v-else-if="txLoading" class="space-y-2">
       <USkeleton v-for="i in 3" :key="i" class="h-12 w-full" />
     </div>
 
-    <UModal
-      v-model:open="bulkReserveDateModalOpen"
-      title="Date for combined savings"
-      class="sm:max-w-md"
-    >
+    <UModal v-model:open="bulkReserveDateModalOpen" title="Date for combined savings" class="sm:max-w-md">
       <template #body>
         <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
           One reserve line will be added for
@@ -273,29 +117,34 @@
           date for that reserve; it must fall in this statement period.
         </p>
         <UFormField label="Transaction date" required class="mb-4">
-          <UInput
-            v-model="bulkReserveDateIso"
-            type="date"
-            class="w-full max-w-xs"
-            icon="i-heroicons-calendar-days-20-solid"
-          />
+          <UInput v-model="bulkReserveDateIso" type="date" class="w-full max-w-xs"
+            icon="i-heroicons-calendar-days-20-solid" />
         </UFormField>
         <div class="flex flex-wrap justify-end gap-2">
-          <UButton
-            color="neutral"
-            variant="outline"
-            label="Cancel"
-            :disabled="bulkReserveSaving"
-            @click="bulkReserveDateModalOpen = false"
-          />
-          <UButton
-            color="primary"
-            variant="solid"
-            label="Add reserve"
-            :loading="bulkReserveSaving"
-            :disabled="bulkReserveSaving || !bulkReserveDateIso"
-            @click="confirmBulkReserveWithDate"
-          />
+          <UButton color="neutral" variant="outline" label="Cancel" :disabled="bulkReserveSaving"
+            @click="bulkReserveDateModalOpen = false" />
+          <UButton color="primary" variant="solid" label="Add reserve" :loading="bulkReserveSaving"
+            :disabled="bulkReserveSaving || !bulkReserveDateIso" @click="confirmBulkReserveWithDate" />
+        </div>
+      </template>
+    </UModal>
+    <UModal v-model:open="isFilterModalOpen" title="Filter transactions">
+      <template #body>
+        <UFormField v-if="cardMenuItems.length" name="cardFilter" label="Card">
+          <USelectMenu v-model="tempSelectedCardId" value-key="id" :items="cardMenuItems" placeholder="Select card"
+            class="w-full" />
+        </UFormField>
+        <UFormField v-if="cycleMenuItems.length" name="statementCycle" label="Statement" class="mt-4">
+          <USelectMenu v-model="tempSelectedCycleKey" value-key="id" :items="cycleMenuItems" class="w-full" />
+        </UFormField>
+        <UFormField name="dateFilter" label="Specific date" class="mt-4">
+          <USelectMenu v-model="tempSelectedDateId" value-key="id"
+            :items="[{ id: 'ALL', label: 'All days in statement' }, ...tempPeriodDates]"
+            placeholder="All days in statement" class="w-full" />
+        </UFormField>
+        <div class="flex justify-end gap-3 mt-6">
+          <UButton color="neutral" variant="outline" label="Cancel" @click="isFilterModalOpen = false" />
+          <UButton color="neutral" variant="solid" label="OK" @click="applyFilter" />
         </div>
       </template>
     </UModal>
@@ -303,6 +152,7 @@
 </template>
 
 <script setup>
+import { format, eachDayOfInterval } from "date-fns";
 import {
   listCardStatementCycleMenuItems,
   listRecentBillingCycleKeyItems,
@@ -341,6 +191,47 @@ const bulkReserveDateIso = ref("");
 const memberFilterUserId = ref("ALL");
 const selectedCardId = ref(null);
 const selectedCycleKey = ref("");
+const selectedDateId = ref("ALL");
+
+const isFilterModalOpen = ref(false);
+const tempSelectedCardId = ref(null);
+const tempSelectedCycleKey = ref("");
+const tempSelectedDateId = ref("ALL");
+
+const effectiveCardId = computed(() => isFilterModalOpen.value ? tempSelectedCardId.value : selectedCardId.value);
+
+const tempPeriodDates = computed(() => {
+  const row = cycleMenuItems.value.find((c) => c.id === tempSelectedCycleKey.value);
+  if (!row?.start || !row?.end) return [];
+  try {
+    const days = eachDayOfInterval({ start: row.start, end: row.end });
+    return days.map((d) => {
+      const val = format(d, "yyyy-MM-dd");
+      return { id: val, label: format(d, "MMM d, yyyy") };
+    });
+  } catch (e) {
+    return [];
+  }
+});
+
+watch(tempSelectedCycleKey, () => {
+  tempSelectedDateId.value = "ALL";
+});
+
+watch(isFilterModalOpen, (open) => {
+  if (open) {
+    tempSelectedCardId.value = selectedCardId.value;
+    tempSelectedCycleKey.value = selectedCycleKey.value;
+    tempSelectedDateId.value = selectedDateId.value;
+  }
+});
+
+const applyFilter = () => {
+  selectedCardId.value = tempSelectedCardId.value;
+  selectedCycleKey.value = tempSelectedCycleKey.value;
+  selectedDateId.value = tempSelectedDateId.value;
+  isFilterModalOpen.value = false;
+};
 
 const memberDisplayName = (m) => {
   const n = m?.profiles?.full_name;
@@ -369,9 +260,9 @@ const cardOwnerDisplayName = computed(() =>
 function isMemberItemCardOwner(item) {
   return Boolean(
     item &&
-      typeof item === "object" &&
-      item.isCardOwner &&
-      item.id !== "ALL",
+    typeof item === "object" &&
+    item.isCardOwner &&
+    item.id !== "ALL",
   );
 }
 
@@ -410,13 +301,13 @@ const { data: cardRows, pending: cardsPending, refresh: refreshCards } =
   );
 
 const { data: rpcCycles, refresh: refreshCycles } = await useAsyncData(
-  () => `group-cycles-rpc-${props.groupId}-${selectedCardId.value ?? 'none'}`,
+  () => `group-cycles-rpc-${props.groupId}-${effectiveCardId.value ?? 'none'}`,
   async () => {
     if (!import.meta.client) return [];
-    if (!selectedCardId.value) return [];
+    if (!effectiveCardId.value) return [];
     const { data, error } = await supabase.rpc('get_group_cycles', {
       p_group_id: props.groupId,
-      p_card_id: selectedCardId.value
+      p_card_id: effectiveCardId.value
     });
     if (error) {
       console.error(error);
@@ -424,14 +315,14 @@ const { data: rpcCycles, refresh: refreshCycles } = await useAsyncData(
     }
     return (data ?? []).map(x => x.billing_cycle_key);
   },
-  { watch: [() => props.groupId, selectedCardId] }
+  { watch: [() => props.groupId, effectiveCardId] }
 );
 
 const allCycleMenuItems = computed(() => {
-  if (!selectedCardId.value) {
+  if (!effectiveCardId.value) {
     return listRecentBillingCycleKeyItems(20);
   }
-  const row = (cardRows.value ?? []).find((c) => c.id === selectedCardId.value);
+  const row = (cardRows.value ?? []).find((c) => c.id === effectiveCardId.value);
   if (!row) {
     return listRecentBillingCycleKeyItems(20);
   }
@@ -455,8 +346,14 @@ watch(
   () => cycleMenuItems.value,
   (items) => {
     if (!items?.length) return;
-    if (!items.some((x) => x.id === selectedCycleKey.value)) {
-      selectedCycleKey.value = items[0].id;
+    if (isFilterModalOpen.value) {
+      if (!items.some((x) => x.id === tempSelectedCycleKey.value)) {
+        tempSelectedCycleKey.value = items[0].id;
+      }
+    } else {
+      if (!items.some((x) => x.id === selectedCycleKey.value)) {
+        selectedCycleKey.value = items[0].id;
+      }
     }
   },
   { immediate: true, deep: true },
@@ -576,8 +473,13 @@ const nonOwnerIds = computed(() =>
     .map((m) => m.user_id),
 );
 
+const currentFilteredByDate = computed(() => {
+  if (selectedDateId.value === "ALL") return currentList.value ?? [];
+  return (currentList.value ?? []).filter((t) => t.created_at?.startsWith(selectedDateId.value));
+});
+
 const settlementRows = computed(() => {
-  const cur = currentList.value ?? [];
+  const cur = currentFilteredByDate.value;
   const oId = ownerUserId.value;
   if (!oId) return [];
   return nonOwnerIds.value.map((userId) => {
@@ -603,7 +505,7 @@ const byUserSpent = computed(() => {
   (props.members ?? []).forEach((m) => {
     if (m?.user_id) map[m.user_id] = 0;
   });
-  for (const t of currentList.value ?? []) {
+  for (const t of currentFilteredByDate.value) {
     if ((isCcSpend(t) || t.type === "Expense") && t.user_id) {
       map[t.user_id] = (map[t.user_id] ?? 0) + (t.amount || 0);
     }
@@ -649,10 +551,10 @@ function netSavedByUserMap(list) {
   return map;
 }
 
-const byUserSaved = computed(() => netSavedByUserMap(currentList.value ?? []));
+const byUserSaved = computed(() => netSavedByUserMap(currentFilteredByDate.value));
 
 const allMembersView = computed(() => {
-  const curL = currentList.value ?? [];
+  const curL = currentFilteredByDate.value;
   const oId = ownerUserId.value;
   const sumE = (L) =>
     r2(
@@ -721,11 +623,26 @@ const nonOwnerView = computed(() => {
 
 const filteredList = computed(() =>
   filterTransactionsByUserId(
-    currentList.value ?? [],
+    currentFilteredByDate.value,
     memberFilterUserId.value,
   ),
 );
 const byDate = computed(() => groupTransactionsByDate(filteredList.value));
+
+const selectedCycleRow = computed(
+  () => cycleMenuItems.value.find((x) => x.id === selectedCycleKey.value) ?? cycleMenuItems.value[0]
+);
+const selectedCycleLabel = computed(() => selectedCycleRow.value?.label ?? "");
+
+const selectedCardRow = computed(() => (cardRows.value ?? []).find((c) => c.id === selectedCardId.value));
+
+const filterPeriodLabel = computed(() => {
+  let lbl = selectedCycleLabel.value;
+  if (selectedDateId.value !== "ALL") {
+    lbl = format(new Date(selectedDateId.value + 'T12:00:00'), "MMM d, yyyy");
+  }
+  return selectedCardRow.value ? `${selectedCardRow.value.name} \u00B7 ${lbl}` : lbl;
+});
 
 /** Plain card spend lines only (checkbox + bulk reserve source). */
 function isCcCardSpendOnly(t) {
@@ -773,8 +690,8 @@ const selectedSpendCount = computed(
 const bulkReserveButtonLabel = computed(() => {
   const n = selectedSpendCount.value;
   if (n <= 0) return "";
-  if (n === 1) return "Save money for this line";
-  return `Save money for these ${n} lines`;
+  if (n === 1) return "Save money for this transaction";
+  return `Save money for these ${n} transactions`;
 });
 
 function openBulkReserveDateModal() {
@@ -783,7 +700,7 @@ function openBulkReserveDateModal() {
   if (!rows.length) {
     toastError({
       title: "Nothing selected",
-      description: "Select one or more card spend lines.",
+      description: "Select one or more card transactions.",
     });
     return;
   }
@@ -931,16 +848,4 @@ watch([selectedCardId, selectedCycleKey, memberFilterUserId], () => {
   selectedSpendIds.value = [];
 });
 
-const filterNote = computed(() => {
-  if (memberFilterUserId.value === "ALL" || !ownerUserId.value) {
-    return null;
-  }
-  if (memberFilterUserId.value === ownerUserId.value) {
-    return "Card owner view: summary is yours; list is your lines on this card for this period.";
-  }
-  const m = memberFilterItems.value.find(
-    (x) => x.id === memberFilterUserId.value,
-  );
-  return `Summary and list for ${m?.label ?? "this member"} in this period.`;
-});
 </script>

@@ -1,12 +1,7 @@
 <template>
   <div class="space-y-8">
     <div>
-      <NuxtLink
-        to="/"
-        class="text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-      >
-        ← Summary
-      </NuxtLink>
+      <UButton to="/" icon="i-heroicons-arrow-left" color="neutral" variant="outline" aria-label="Back to Summary" />
       <h1 class="mt-3 text-2xl font-bold text-gray-900 dark:text-white">Credit cards</h1>
       <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
         Each billing field is a
