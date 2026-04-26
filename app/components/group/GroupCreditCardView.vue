@@ -69,7 +69,7 @@
         </div>
         <div v-if="filteredList.length"
           class="flex items-center justify-between gap-3 border-t border-gray-200 pt-3 dark:border-gray-800 sm:flex-row sm:flex-wrap sm:items-center">
-          <div v-if="memberFilterUserId === user?.id" class="max-w-md">
+          <div v-if="memberFilterUserId === (user?.id || user?.sub)" class="max-w-md">
             <USwitch v-model="spendToReserveMode" :disabled="!canAddLine" label="Spends to reserves" />
           </div>
           <div v-else></div>
@@ -284,10 +284,6 @@ const memberFilterItems = computed(() => {
       id: m.user_id,
       isCardOwner: m.role === "owner",
     }));
-
-  if (user.value?.id && user.value.id !== ownerUserId.value) {
-    return rows.filter((m) => m.id === user.value.id);
-  }
 
   return [{ label: "All members", id: "ALL", isCardOwner: false }, ...rows];
 });
