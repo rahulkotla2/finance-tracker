@@ -41,22 +41,34 @@
     </section>
 
     <section v-else-if="memberFilterUserId === ownerUserId && ownerUserId && hasCard"
-      class="grid grid-cols-2 sm:grid-cols-2 gap-4 lg:grid-cols-4 sm:gap-10 lg:gap-14">
-      <Trend color="red" title="Your Spends" :amount="ownerAsMemberView.mySpent" :loading="txLoading" />
+      class="grid grid-cols-2 sm:grid-cols-2 gap-4 lg:grid-cols-5 sm:gap-10 lg:gap-14">
+      <Trend color="red" :title="ownerTrendTitles.spends" :amount="ownerAsMemberView.mySpent" :loading="txLoading" />
       <Trend :color="ownerAsMemberView.mySaved < 0 ? 'text-amber-600 dark:text-amber-400' : 'green'"
-        title="Your Savings" :amount="ownerAsMemberView.mySaved" :loading="txLoading" />
-      <Trend color="text-amber-600 dark:text-amber-400" title="Amount Receivable"
+        :title="ownerTrendTitles.savings" :amount="ownerAsMemberView.mySaved" :loading="txLoading" />
+      <Trend
+        :color="ownerAsMemberView.balanceToSavings > 0 ? 'red' : 'green'"
+        :title="ownerTrendTitles.needToSave"
+        :amount="ownerAsMemberView.balanceToSavings"
+        :loading="txLoading"
+      />
+      <Trend color="text-amber-600 dark:text-amber-400" :title="ownerTrendTitles.amountReceivable"
         :amount="ownerAsMemberView.shouldGetFromOthers" :loading="txLoading" />
-      <Trend color="green" title="Amount Received" :amount="ownerAsMemberView.gotFromOthers" :loading="txLoading" />
+      <Trend color="green" :title="ownerTrendTitles.amountReceived" :amount="ownerAsMemberView.gotFromOthers" :loading="txLoading" />
     </section>
 
     <section v-else-if="hasCard && memberFilterUserId && memberFilterUserId !== 'ALL'"
-      class="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-10 lg:gap-14">
-      <Trend color="red" title="Expenses" :amount="nonOwnerView.spent" :loading="txLoading" />
-      <Trend :color="nonOwnerView.saved < 0 ? 'text-amber-600 dark:text-amber-400' : 'green'" title="Savings"
+      class="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-5 sm:gap-10 lg:gap-14">
+      <Trend color="red" :title="nonOwnerTrendTitles.expenses" :amount="nonOwnerView.spent" :loading="txLoading" />
+      <Trend :color="nonOwnerView.saved < 0 ? 'text-amber-600 dark:text-amber-400' : 'green'" :title="nonOwnerTrendTitles.savings"
         :amount="nonOwnerView.saved" :loading="txLoading" />
-      <Trend color="green" title="Paid" :amount="nonOwnerView.paidToOwner" :loading="txLoading" />
-      <Trend color="red" title="Owed" :amount="nonOwnerView.stillOwesOwner" :loading="txLoading" />
+      <Trend
+        :color="nonOwnerView.balanceToSavings > 0 ? 'red' : 'green'"
+        :title="nonOwnerTrendTitles.needToSave"
+        :amount="nonOwnerView.balanceToSavings"
+        :loading="txLoading"
+      />
+      <Trend color="green" :title="nonOwnerTrendTitles.paid" :amount="nonOwnerView.paidToOwner" :loading="txLoading" />
+      <Trend color="red" :title="nonOwnerTrendTitles.owed" :amount="nonOwnerView.stillOwesOwner" :loading="txLoading" />
     </section>
 
     <section v-if="hasCard" class="flex flex-wrap items-start justify-between gap-4 mb-6">
@@ -75,6 +87,7 @@
           <div v-else></div>
           <div class="flex items-center gap-2">
             <TransactionModal v-model:isOpen="isAddOpen" :group-id="groupId" :group-owner-user-id="ownerUserId"
+              :group-members="members"
               :credit-card-id="selectedCardId" :billing-cycle-key="selectedCycleKey"
               :card-billing-cycle-start-day="selectedCard?.billing_cycle_start_day"
               :card-billing-cycle-end-day="selectedCard?.billing_cycle_end_day" credit-card @saved="refreshData" />
@@ -121,7 +134,7 @@
           <span class="font-medium tabular-nums">{{ new Intl.NumberFormat('en-US', { style: 'currency', currency: 'INR' }).format(bulkReserveDefaultAmount) }}</span>.
         </p>
         <UFormField label="Reserve Amount" required class="mb-4">
-          <UInput v-model="bulkReserveAmount" type="number" step="0.01" class="w-full max-w-xs" />
+          <AmountCalculatorInput v-model="bulkReserveAmount" placeholder="Reserve amount" input-class="w-full max-w-xs" />
         </UFormField>
         <div class="flex flex-wrap justify-end gap-2">
           <UButton color="neutral" variant="outline" label="Cancel" :disabled="bulkReserveSaving"
@@ -694,6 +707,7 @@ const ownerAsMemberView = computed(() => {
     return {
       mySpent: 0,
       mySaved: 0,
+      balanceToSavings: 0,
       shouldGetFromOthers: 0,
       gotFromOthers: 0,
     };
@@ -706,6 +720,7 @@ const ownerAsMemberView = computed(() => {
   return {
     mySpent: r2(byUserSpent.value[oId] ?? 0),
     mySaved: r2(byUserSaved.value[oId] ?? 0),
+    balanceToSavings: r2((byUserSpent.value[oId] ?? 0) - (byUserSaved.value[oId] ?? 0)),
     shouldGetFromOthers,
     gotFromOthers,
   };
@@ -719,8 +734,65 @@ const nonOwnerView = computed(() => {
   return {
     spent: r2(s[id] ?? 0),
     saved: r2(sv[id] ?? 0),
+    balanceToSavings: r2((s[id] ?? 0) - (sv[id] ?? 0)),
     paidToOwner: r2(row?.paid ?? 0),
     stillOwesOwner: r2(row?.pending ?? 0),
+  };
+});
+
+const currentViewerUserId = computed(() => {
+  const id = user.value?.id ?? user.value?.sub;
+  return id ? String(id) : "";
+});
+
+const isViewingOwnMemberDetails = computed(() => {
+  if (!memberFilterUserId.value || memberFilterUserId.value === "ALL") return false;
+  if (!currentViewerUserId.value) return false;
+  return String(memberFilterUserId.value) === currentViewerUserId.value;
+});
+
+const isViewingOwnerAsSelf = computed(() => {
+  if (!ownerUserId.value || !currentViewerUserId.value) return false;
+  return String(ownerUserId.value) === currentViewerUserId.value;
+});
+
+const ownerTrendTitles = computed(() => {
+  if (isViewingOwnerAsSelf.value) {
+    return {
+      spends: "Your Spends",
+      savings: "Your Savings",
+      needToSave: "Need to Save",
+      amountReceivable: "Your Amount Receivable",
+      amountReceived: "Your Amount Received",
+    };
+  }
+
+  return {
+    spends: "Spends",
+    savings: "Savings",
+    needToSave: "Need to Save",
+    amountReceivable: "Amount Receivable",
+    amountReceived: "Amount Received",
+  };
+});
+
+const nonOwnerTrendTitles = computed(() => {
+  if (isViewingOwnMemberDetails.value) {
+    return {
+      expenses: "Your Expenses",
+      savings: "Your Savings",
+      needToSave: "Need to Save",
+      paid: "You Paid",
+      owed: "You Owed",
+    };
+  }
+
+  return {
+    expenses: "Expenses",
+    savings: "Savings",
+    needToSave: "Need to Save",
+    paid: "Paid",
+    owed: "Owed",
   };
 });
 

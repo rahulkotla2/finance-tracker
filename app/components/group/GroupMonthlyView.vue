@@ -82,6 +82,7 @@
         <TransactionModal
           v-model:isOpen="isAddOpen"
           :group-id="groupId"
+          :group-members="members"
           @saved="refreshData"
         />
         <UButton
@@ -309,9 +310,8 @@ const { data: rpcCycles, refresh: refreshCycles } = await useAsyncData(
   () => `group-cycles-rpc-${props.groupId}`,
   async () => {
     if (!import.meta.client) return [];
-    const { data, error } = await supabase.rpc('get_group_cycles', {
-      p_group_id: props.groupId,
-      p_card_id: null
+    const { data, error } = await supabase.rpc('get_monthly_group_cycles', {
+      p_group_id: props.groupId
     });
     if (error) {
       console.error(error);
