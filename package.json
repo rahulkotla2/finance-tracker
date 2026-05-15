@@ -24,6 +24,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@faker-js/faker": "^10.3.0"
+    "@faker-js/faker": "^10.3.0",
+    "@vite-pwa/nuxt": "^1.1.1"
   }
 }
